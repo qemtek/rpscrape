@@ -2,7 +2,7 @@
 
 """ Scrapes results and saves them in csv format """
 
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from git import Repo, cmd
 import json
 from lxml import html
@@ -153,7 +153,7 @@ def valid_region(code):
 
 def valid_years(years):
     if years:
-        return all(year.isdigit() and int(year) >= 1987 and int(year) <= 2020 for year in years)
+        return all(year.isdigit() and int(year) >= 1987 and int(year) <= datetime.today().date for year in years)
 
     return False
 
@@ -162,10 +162,10 @@ def valid_date(date):
     if len(date.split('/')) == 3:
         try:
             year, month, day = [int(x) for x in date.split('/')]
-            return year >= 1987 and year <= 2020 and month > 0 and month <= 12 and day > 0 and day <= 31
+            return year >= 1987 and year <= datetime.today().date and month > 0 and month <= 12 and day > 0 and day <= 31
         except ValueError:
             return False
-    
+
     return False
 
 
@@ -940,15 +940,16 @@ def parse_args(args=sys.argv):
                 try:
                     years = [str(x) for x in range(int(args[1].split("-")[0]), int(args[1].split("-")[1]) + 1)]
                 except ValueError:
-                    return print("\nINVALID YEAR: must be in range 1996-2020.\n")
+                    return print(f"\nINVALID YEAR: must be in range 1996-{datetime.today().date}.\n")
             else:
                 years = [args[1]]
             if not valid_years(years):
-                return print("\nINVALID YEAR: must be in range 1988-2020 for flat and 1987-2019 for jumps.\n")
+                return print(f"\nINVALID YEAR: must be in range 1988-{datetime.today().date} for flat and "
+                             f"1987-{datetime.today().date-1} for jumps.\n")
 
             if code == "jumps":
-                if int(years[-1]) > 2019:
-                    return print("\nINVALID YEAR: the latest jump season started in 2019.\n")
+                if int(years[-1]) > datetime.today().date-1:
+                    return print(f"\nINVALID YEAR: the latest jump season started in {datetime.today().date-1}.\n")
 
             if "region" in locals():
                 tracks = [course[0] for course in courses(region)]
