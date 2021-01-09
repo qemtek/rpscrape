@@ -1,5 +1,4 @@
 import awswrangler as wr
-import boto3
 import pandas as pd
 import time
 import os
@@ -8,14 +7,9 @@ import numpy as np
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE, SCHEMA_COLUMNS, \
-    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE, SCHEMA_COLUMNS, boto3_session
 from RPScraper.src.utils.general import clean_data
 
-session = boto3.session.Session(
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-)
 
 df_all_dir = f'{PROJECT_DIR}/tmp/df_all.csv'
 
@@ -37,10 +31,12 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
             df['year'] = df['date'].apply(lambda x: x.year)
             df['id'] = df.apply(lambda x: hash(f"{x['country']}_{x['date']}_{x['name']}_{x['off']}"), axis=1)
             df = df[list(SCHEMA_COLUMNS.keys())]
+            mode = 'a' if os.path.exists(df_all_dir) else 'w'
+            header = False if os.path.exists(df_all_dir) else True
             df.to_csv(df_all_dir, mode=mode, header=header, index=index)
             date = local_path.split('/')[-1].split('.')[0].replace('_', '-')
             file_name = f"{country}_{date}"
-            wr.s3.to_parquet(df, f"s3://{S3_BUCKET}/data/{file_name}.parquet", boto3_session=session)
+            #wr.s3.to_parquet(df, f"s3://{S3_BUCKET}/data/{file_name}.parquet", boto3_session=boto3_session)
     except pyarrow.lib.ArrowInvalid as e:
         print(f"Loading parquet file failed. \nFile path: {local_path}. \nError: {e}")
 
@@ -88,10 +84,10 @@ def upload_local_files_to_dataset(folder='data', full_refresh=False):
                 #df[key] = df[key].fillna(pd.NA)
         wr.s3.to_parquet(df, path=f's3://{S3_BUCKET}/datasets/', dataset=True,
                          dtype=SCHEMA_COLUMNS, mode='overwrite' if full_refresh else 'append',
-                         boto3_session=session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
+                         boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
                          partition_cols=['year'])
         print(f"Uploaded data to parquet dataset")
 
 
 if __name__ == '__main__':
-    upload_local_files_to_dataset(full_refresh=False)
+    upload_local_files_to_dataset(full_refresh=True)

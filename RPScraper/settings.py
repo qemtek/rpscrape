@@ -1,4 +1,5 @@
 import boto3
+import os
 
 from RPScraper.src.utils.config import get_attribute
 
@@ -11,7 +12,10 @@ AWS_GLUE_TABLE = get_attribute('AWS_GLUE_TABLE')
 AWS_ACCESS_KEY_ID = get_attribute('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = get_attribute('AWS_SECRET_ACCESS_KEY')
 
-boto3_session = boto3.session.Session()
+boto3_session = boto3.session.Session(
+     aws_access_key_id=AWS_ACCESS_KEY_ID,
+     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+)
 
 SCHEMA_COLUMNS = {
      'date': 'timestamp',

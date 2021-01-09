@@ -18,7 +18,7 @@ df_gb = wr.athena.read_sql_query("select distinct country, date from rpscrape wh
 df_ire = wr.athena.read_sql_query("select distinct country, date from rpscrape where country = 'ire'",
                                   database=DATABASE, boto3_session=boto3_session)
 
-d1 = pd.to_datetime('2011-01-01')
+d1 = pd.to_datetime('2020-01-01')
 d2 = pd.to_datetime(dt.datetime.today().date() - dt.timedelta(days=1))
 
 # this will give you a list containing all of the dates
