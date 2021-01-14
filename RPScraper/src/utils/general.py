@@ -41,8 +41,11 @@ def clean_name(x, illegal_symbols="'$@#^(%*)._ ", append_with=None):
 
 def clean_horse_name(x, illegal_symbols="'$@#^(%*) ", append_with=None):
     # Remove the country part
-    x = ' '.join(x.split(' ')[:-1])
-    x = clean_name(x, illegal_symbols=illegal_symbols, append_with=append_with)
+    try:
+        x = ' '.join(str(x).split(' ')[:-1])
+        x = clean_name(x, illegal_symbols=illegal_symbols, append_with=append_with)
+    except Exception as e:
+        print(f"clean_horse_name failed. x: {x}. Error: {e}")
     return x
 
 

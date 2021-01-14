@@ -90,4 +90,5 @@ def upload_local_files_to_dataset(folder='data', full_refresh=False):
 
 
 if __name__ == '__main__':
-    upload_local_files_to_dataset(full_refresh=True)
+    os.remove(f"{PROJECT_DIR}/tmp/df_all.csv")
+    upload_local_files_to_dataset(full_refresh=False)
