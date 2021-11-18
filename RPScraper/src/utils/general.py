@@ -82,9 +82,9 @@ def clean_data(df_in, country):
     # Add dam and sire names to horse name to make it unique
     df['horse_cleaned'] = df.apply(lambda x: f"{x['horse_cleaned']}_{x['dam_cleaned']}_{x['sire_cleaned']}", axis=1)
     # Clean jockey name
-    df['jockey_cleaned'] = df['jockey'].apply(lambda x: clean_name(x))
+    df['jockey_cleaned'] = df['jockey'].apply(lambda x: x.replace('.', '').lower())
     # Clean trainer name
-    df['trainer_cleaned'] = df['trainer'].apply(lambda x: clean_name(x))
+    df['trainer_cleaned'] = df['trainer'].apply(lambda x: x.replace('.', '').lower())
 
     return df
 
