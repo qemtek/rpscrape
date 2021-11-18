@@ -121,6 +121,6 @@ virtualenv==20.3.1
     # via tox
 zipp==3.4.0
     # via importlib-metadata
-
+aiohttp
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

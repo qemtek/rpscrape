@@ -6,6 +6,7 @@
 *.html
 *.DS_Store
 Venv/*
+venv/*
 RPScraper/configuration.py
 RPScraper/data/*
 RPScraper/s3_data/*

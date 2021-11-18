@@ -127,7 +127,7 @@ def x_y():
 
 
 def regions():
-    with open('../../courses/_countries', 'r') as regions:
+    with open('../../courses/_regions', 'r') as regions:
         return json.load(regions)
 
 
