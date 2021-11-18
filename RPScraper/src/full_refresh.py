@@ -43,7 +43,7 @@ end_date = date_today - dt.timedelta(days=1)
 print(f"End date: {end_date}")
 
 # Get the countries we want
-countries = ["ire", "gb", "aus", "usa"]
+countries = ["usa"] #"ire", "gb", "aus",
 # Find the number of days between the start and end dates
 delta = end_date - start_date
 dates = list()
