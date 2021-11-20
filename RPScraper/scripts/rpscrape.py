@@ -6,15 +6,15 @@ import sys
 
 from orjson import loads
 
-from utils.argparser import ArgParser
-from utils.completer import Completer
-from utils.race import Race, VoidRaceError
-from utils.settings import Settings
-from utils.update import Update
+from RPScraper.scripts.utils.argparser import ArgParser
+from RPScraper.scripts.utils.completer import Completer
+from RPScraper.scripts.utils.race import Race, VoidRaceError
+from RPScraper.scripts.utils.settings import Settings
+from RPScraper.scripts.utils.update import Update
 
-from utils.async_funcs import get_documents, get_jsons
-from utils.course import course_name, courses
-from utils.lxml_funcs import xpath
+from RPScraper.scripts.utils.async_funcs import get_documents, get_jsons
+from RPScraper.scripts.utils.course import course_name, courses
+from RPScraper.scripts.utils.lxml_funcs import xpath
 
 settings = Settings()
 
@@ -135,6 +135,7 @@ def main():
         while True:
             args = input('[rpscrape]> ').lower().strip()
             args = parser.parse_args_interactive([arg.strip() for arg in args.split()])
+            print(args)
 
             if args:
                 if 'dates' in args:

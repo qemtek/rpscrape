@@ -16,7 +16,7 @@ df_all_dir = f'{PROJECT_DIR}/tmp/df_all.csv'
 
 def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
     try:
-        if folder == 'data':
+        if folder == 'data/dates':
             df = pd.read_csv(local_path)
             if len(df) > 0:
                 country = local_path.split('/')[-2]
@@ -29,19 +29,16 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
             df['prize'] = df['prize'].astype(str)
             df['date'] = pd.to_datetime(df['date'])
             df['year'] = df['date'].apply(lambda x: x.year)
-            df['id'] = df.apply(lambda x: hash(f"{x['country']}_{x['date']}_{x['name']}_{x['off']}"), axis=1)
             df = df[list(SCHEMA_COLUMNS.keys())]
             mode = 'a' if os.path.exists(df_all_dir) else 'w'
             header = False if os.path.exists(df_all_dir) else True
             df.to_csv(df_all_dir, mode=mode, header=header, index=index)
-            date = local_path.split('/')[-1].split('.')[0].replace('_', '-')
-            file_name = f"{country}_{date}"
-            #wr.s3.to_parquet(df, f"s3://{S3_BUCKET}/data/{file_name}.parquet", boto3_session=boto3_session)
+
     except pyarrow.lib.ArrowInvalid as e:
         print(f"Loading parquet file failed. \nFile path: {local_path}. \nError: {e}")
 
 
-def upload_local_files_to_dataset(folder='data', full_refresh=False):
+def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
     scheduler2 = BackgroundScheduler()
     # Get all files currently in S3
     folders = os.listdir(f"{PROJECT_DIR}/{folder}/")

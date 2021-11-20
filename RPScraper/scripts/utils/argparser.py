@@ -3,9 +3,9 @@ import sys
 
 from argparse import ArgumentParser
 
-from utils.course import *
-from utils.date import *
-from utils.region import *
+from RPScraper.scripts.utils.course import *
+from RPScraper.scripts.utils.date import *
+from RPScraper.scripts.utils.region import *
 
 
 help = (
