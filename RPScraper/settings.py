@@ -1,5 +1,4 @@
 import boto3
-import pandas as pd
 
 from RPScraper.src.utils.config import get_attribute
 
@@ -97,4 +96,3 @@ OUTPUT_COLS = ['id', 'date', 'course', 'off', 'type', 'class', 'pattern', 'ratin
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
  'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned',
  'jockey_cleaned', 'trainer_cleaned', 'year']
-
