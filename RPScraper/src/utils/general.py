@@ -42,8 +42,11 @@ def clean_name(x, illegal_symbols="'$@#^(%*)._ ", append_with=None):
 def clean_horse_name(x, illegal_symbols="'$@#^(%*) ", append_with=None):
     # Remove the country part
     try:
-        x = ' '.join(str(x).split(' ')[:-1])
-        x = clean_name(x, illegal_symbols=illegal_symbols, append_with=append_with)
+        if str(x) == 'nan':
+            return 'none'
+        else:
+            x = ' '.join(str(x).split(' ')[:-1])
+            x = clean_name(x, illegal_symbols=illegal_symbols, append_with=append_with)
     except Exception as e:
         print(f"clean_horse_name failed. x: {x}. Error: {e}")
     return x
@@ -66,10 +69,11 @@ def clean_data(df_in, country):
     df = df.drop_duplicates()
     # Convert the 'Off' column into a time object
     df['off'] = df['off'].apply(lambda x: convert_off_to_readable_format(x))
-    # Convert finish time from a time object to seconds
-    df['time'] = df['time'].apply(lambda x: convert_finish_time_to_seconds(x))
-    # Convert the time of horse that did not finish to None
-    df = df.apply(lambda x: nullify_non_finishers(x), axis=1)
+    # Remove commas from any comments
+    df['comment'] = df['comment'].astype(str)
+    df['comment'] = df['comment'].apply(lambda x: x.replace(',', ''))
+
+    df['time'] = df['secs']
     # Create a unique identifier for each race
     df['id'] = df.apply(
         lambda x: hash(f"{x['date']}_{x['course']}_{x['off']}_{x['dist_m']}_{x['age_band']}"), axis=1)
@@ -82,10 +86,19 @@ def clean_data(df_in, country):
     # Add dam and sire names to horse name to make it unique
     df['horse_cleaned'] = df.apply(lambda x: f"{x['horse_cleaned']}_{x['dam_cleaned']}_{x['sire_cleaned']}", axis=1)
     # Clean jockey name
-    df['jockey_cleaned'] = df['jockey'].apply(lambda x: clean_name(x))
+    try:
+        df['jockey_cleaned'] = df['jockey'].apply(lambda x: x.replace('.', '').lower())
+    except:
+        df['jockey_cleaned'] = None
+        df['jockey'] = None
+        df['jockey_id'] = None
     # Clean trainer name
-    df['trainer_cleaned'] = df['trainer'].apply(lambda x: clean_name(x))
-
+    try:
+        df['trainer_cleaned'] = df['trainer'].apply(lambda x: x.replace('.', '').lower())
+    except:
+        df['trainer_cleaned'] = None
+        df['trainer'] = None
+        df['trainer_id'] = None
     return df
 
 

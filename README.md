@@ -1,28 +1,37 @@
 Horse racing data has been hoarded by a few companies, enabling them to effectively extort the public for access to any worthwhile historical amount. Compared to other sports where historical data is easily and freely available to use and query as you please, racing data in most countries is far harder to come by and is often only available with subscriptions to expensive software.
 
-The aim of this tool is to provide a way of gathering large amounts of historical results data at no cost.
+The aim of this tool is to provide a way of gathering large amounts of historical data at no cost.
 
 
-#### Example data from Ascot 2018
+#### Example data (Ascot 2018)
 
 ![data](https://i.postimg.cc/7LncCDMG/data1.png)
-![data](https://i.postimg.cc/SsQPC5DZ/data2.png)
 
+
+#### Table of Contents
+- [Requirements](#requirements)
+- [Install](#install)
+- [Usage](#usage)
+- [Scrape by date](#scrape-by-date)
+- [Command Line Arguments](#command-line-arguments)
+- [Scrape Racecards](#scrape-racecards)
+- [Settings](#settings)
+- [Options](#options)
 
 ## Requirements
 
-You must have Python 3.6 or greater, and GIT installed. You can download the latest Python release [here](https://www.python.org/downloads/). You can download GIT [here](https://git-scm.com/downloads).
+You must have Python 3.7 or greater, and GIT installed. You can download the latest Python release [here](https://www.python.org/downloads/). You can download GIT [here](https://git-scm.com/downloads).
 
-In addition, the [Requests](http://docs.python-requests.org/en/master/), [GitPython](https://gitpython.readthedocs.io/en/stable/) and [LXML](https://lxml.de/) python modules are needed, they can be installed using PIP(_included with Python_) with the following command.
+In addition, the [Requests](http://docs.python-requests.org/en/master/), [tomli](https://pypi.org/project/tomli/), [orjson](https://pypi.org/project/orjson/1.3.0/), [AIOHTTP](https://docs.aiohttp.org/en/stable/) and [LXML](https://lxml.de/) python modules are needed, they can be installed using PIP(_included with Python_) with the following command.
 
 ```
-~$ pip install requests gitpython lxml
+~$ pip3 install requests tomli orjson aiohttp lxml
 ```
 
 ## Install
 
 ```
-~$ git clone https://github.com/4A47/rpscrape.git
+~$ git clone https://github.com/joenano/rpscrape.git
 ```
 
 ## Usage
@@ -30,7 +39,7 @@ In addition, the [Requests](http://docs.python-requests.org/en/master/), [GitPyt
 Run the program from the scripts folder:
 ```
 > cd rpscrape/scripts
-> python rpscrape.py
+> python3 rpscrape.py
 ```
 
 To scrape you must provide 3 options in the following format:
@@ -40,7 +49,7 @@ To scrape you must provide 3 options in the following format:
 
 The first option can be either a region or a specific course.
 
-Each region has a 2 or 3 letter code like "ire" for Ireland or "gb" for Great Britain. You can show the list of region codes with the following command:
+Each region has a 2 or 3 letter code like "ire" for Ireland or "gb" for Great Britain. You can list region codes with the regions command:
 ```
 [rpscrape]> regions
      CODE: mal | Malaysia
@@ -49,12 +58,9 @@ Each region has a 2 or 3 letter code like "ire" for Ireland or "gb" for Great Br
      CODE: ity | Italy
      CODE: swi | Switzerland
      CODE: tur | Turkey
-     CODE: hk  | Hong Kong
-     CODE: chi | Chile
-     CODE: uae | United Arab Emirates
 ```
 
-The other possibility for the first option is that of a specific course. Courses codes are numeric and up to 4 digits long. To view the course codes, use the courses option as shown in the following example.
+The other possibility for the first option is that of a specific course. Course codes are numeric and up to 4 digits long. You can list course codes with the courses command:
 
 ```
 [rpscrape]> courses
@@ -64,11 +70,9 @@ The other possibility for the first option is that of a specific course. Courses
      CODE: 4    | Bangor
      CODE: 5    | Bath
      CODE: 6    | Beverley
-     CODE: 7    | Brighton
-     CODE: 8    | Carlisle
 ```
 
-If you want to search for a specific region or course, add a search term as shown below.
+Add a search term to search for a specific region or course:
 
 ```
 [rpscrape]> regions france
@@ -81,7 +85,7 @@ If you want to search for a specific region or course, add a search term as show
     CODE: 1347 | York Aus
 ```
 
-To list the courses from a specific region, add the region code like so:
+Add a region code to list the courses from that region:
  ```
 [rpscrape]> courses ire
      CODE: 175  | Ballinrobe
@@ -90,8 +94,6 @@ To list the courses from a specific region, add the region code like so:
      CODE: 596  | Cork
      CODE: 178  | Curragh
      CODE: 180  | Down Royal
-     CODE: 179  | Downpatrick
-     CODE: 181  | Dundalk
  ```
 
 The second option can be a year e.g "1999", or a range of years e.g "2005-2015".
@@ -126,7 +128,7 @@ In the above example, Cheltenham races from the season 2018-2019 are scraped, th
 
 ## Scrape by date
 
-To scrape by date or date range, use the -d flag or date option, followed by the date/date range and the region, scraping individual courses in this manner is not included:
+To scrape by date or date range, use the -d flag followed by the date/date range and the region. Scraping individual courses in this manner is not included:
 ```
 [rpscrape]> -d [date|range] [region]
 ```
@@ -166,6 +168,30 @@ To scrape a particular course or region, use the -c or -r flags with the course 
 ./rpscrape.py -r ire -y 2019 -t flat
 ```
 
+## Scrape Racecards
+You can scrape racecards for today or tomorrow, using racecards.py which saves a file containing a json object of racecard information.
+
+### Examples
+There are only two parameter options, either `today` or `tomorrow`.
+
+```
+./racecards.py today
+```
+
+You can see the outer structure of the json and some of the race information below.
+
+![json1](https://i.postimg.cc/Y2ZNmLh5/json.png)
+
+![json2](https://i.postimg.cc/c1thTGtt/json.png)
+
+
+### Settings
+
+The [user_settings.toml](https://github.com/joenano/rpscrape/blob/master/user_settings.toml) file contains the data fields that can be scraped. You can turn fields on and off by setting them true or false. The order of fields in that file will be the maintained in the output csv. The [default_settings.toml](https://github.com/joenano/rpscrape/blob/master/default_settings.toml) file should not be edited, its there as a backup and to introduce any new fields without changing user settings.
+
+![settings](https://i.postimg.cc/sDhG3SQT/settings.png)
+
+
 ### Options
 
 ```
@@ -186,3 +212,5 @@ q, quit, exit       Quit
 
 Tab complete for option keywords is available on Linux.
 
+
+[![Stargazers over time](https://starchart.cc/joenano/rpscrape.svg)](https://starchart.cc/joenano/rpscrape)

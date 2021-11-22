@@ -1,5 +1,4 @@
 import boto3
-import os
 
 from RPScraper.src.utils.config import get_attribute
 
@@ -13,8 +12,9 @@ AWS_ACCESS_KEY_ID = get_attribute('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = get_attribute('AWS_SECRET_ACCESS_KEY')
 
 boto3_session = boto3.session.Session(
-     aws_access_key_id=AWS_ACCESS_KEY_ID,
-     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name='eu-west-1'
 )
 
 SCHEMA_COLUMNS = {
@@ -90,10 +90,9 @@ for key, value in SCHEMA_COLUMNS.items():
     COL_DTYPES[key] = get_dtype(value)
 
 
-OUTPUT_COLS = ['id', 'date', 'race_name', 'course', 'off', 'type', 'class', 'pattern', 'rating_band', 'age_band',
+OUTPUT_COLS = ['id', 'date', 'course', 'off', 'type', 'class', 'pattern', 'rating_band', 'age_band',
  'sex_rest', 'dist_m', 'going', 'num', 'pos', 'ran', 'draw', 'btn', 'ovr_btn', 'horse',
  'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
  'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned',
  'jockey_cleaned', 'trainer_cleaned', 'year']
-

@@ -7,7 +7,8 @@ import numpy as np
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE, SCHEMA_COLUMNS, boto3_session
+from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE,\
+    SCHEMA_COLUMNS, boto3_session, COL_DTYPES, OUTPUT_COLS
 from RPScraper.src.utils.general import clean_data
 
 
@@ -16,8 +17,13 @@ df_all_dir = f'{PROJECT_DIR}/tmp/df_all.csv'
 
 def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
     try:
-        if folder == 'data':
-            df = pd.read_csv(local_path)
+        if folder == 'data/dates':
+            df = pd.read_csv(local_path,  warn_bad_lines=True, error_bad_lines=False)
+            cols = df.columns
+            for key, value in COL_DTYPES.items():
+                if key in cols:
+                    if value in ['int', 'double']:
+                        df[key] = pd.to_numeric(df[key], errors='coerce')
             if len(df) > 0:
                 country = local_path.split('/')[-2]
                 df = clean_data(df, country=country)
@@ -29,14 +35,20 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
             df['prize'] = df['prize'].astype(str)
             df['date'] = pd.to_datetime(df['date'])
             df['year'] = df['date'].apply(lambda x: x.year)
-            df['id'] = df.apply(lambda x: hash(f"{x['country']}_{x['date']}_{x['name']}_{x['off']}"), axis=1)
             df = df[list(SCHEMA_COLUMNS.keys())]
             mode = 'a' if os.path.exists(df_all_dir) else 'w'
             header = False if os.path.exists(df_all_dir) else True
-            df.to_csv(df_all_dir, mode=mode, header=header, index=index)
-            date = local_path.split('/')[-1].split('.')[0].replace('_', '-')
-            file_name = f"{country}_{date}"
-            #wr.s3.to_parquet(df, f"s3://{S3_BUCKET}/data/{file_name}.parquet", boto3_session=boto3_session)
+            for col in OUTPUT_COLS:
+                if col in df.columns:
+                    pass
+                else:
+                    # Dont append the dataframe if there is a column mismatch
+                    print(f"Skipping day with bad data: {df[['date', 'course']].unique()}")
+                    return None
+            df[OUTPUT_COLS].to_csv(df_all_dir, mode=mode, header=header, index=index)
+            with open(df_all_dir, 'a') as f_out:
+                f_out.write('\n')
+
     except pyarrow.lib.ArrowInvalid as e:
         print(f"Loading parquet file failed. \nFile path: {local_path}. \nError: {e}")
 
@@ -107,6 +119,4 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 
 if __name__ == '__main__':
     df_all_dir = f"{PROJECT_DIR}/tmp/df_all.csv"
-    if os.path.exists(df_all_dir):
-        os.remove(df_all_dir)
     upload_local_files_to_dataset(full_refresh=False)

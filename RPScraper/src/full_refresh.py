@@ -8,7 +8,6 @@ import boto3
 
 from apscheduler.schedulers.background import BlockingScheduler
 
-from RPScraper.src.utils.general import upload_csv_to_s3
 from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 use_files_in_s3 = False
@@ -29,7 +28,7 @@ scheduler = BlockingScheduler()
 
 def run_rpscrape(country, date):
     try:
-        subprocess.call(f'echo "-d {date} {country}" | python3 ../scripts/rpscrape.py', shell=True)
+        subprocess.call(f'python ../scripts/rpscrape.py -d {date} -r {country}', shell=True)
         print(f'Finished scraping {country} - {date}')
         # upload_csv_to_s3(country, date)
     except EOFError:
@@ -43,7 +42,7 @@ end_date = date_today - dt.timedelta(days=1)
 print(f"End date: {end_date}")
 
 # Get the countries we want
-countries = ["gb", "ire"]  # ["aus", "usa"]
+countries = ["usa", "ire", "gb", "aus"]
 # Find the number of days between the start and end dates
 delta = end_date - start_date
 dates = list()
@@ -58,7 +57,6 @@ for country in countries:
         if not exists_remotely:
             if exists_locally:
                 print(f"{country}/{str(day).replace('/', '_')} exists locally but not on S3, uploading local file..")
-                #upload_csv_to_s3(country, day)
             else:
                 scheduler.add_job(id=str(hash(f"{day}_{country}")), func=run_rpscrape, name=f"{country}-{day}",
                                   kwargs={'country': country, 'date': day}, replace_existing=True,
