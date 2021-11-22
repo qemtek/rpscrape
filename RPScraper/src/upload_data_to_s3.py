@@ -41,7 +41,7 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
         print(f"Loading parquet file failed. \nFile path: {local_path}. \nError: {e}")
 
 
-def upload_local_files_to_dataset(folder='data', full_refresh=False):
+def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
     scheduler2 = BackgroundScheduler()
     # Get all files currently in S3
     folders = os.listdir(f"{PROJECT_DIR}/{folder}/")
@@ -69,20 +69,36 @@ def upload_local_files_to_dataset(folder='data', full_refresh=False):
     while len(scheduler2._pending_jobs) > 0:
         print(f"Jobs left: {len(scheduler2._pending_jobs)}")
     scheduler2.shutdown()
+
     # Upload the dataframe to the /datasets/ directory in S3
     if os.path.exists(df_all_dir):
-        df = pd.read_csv(df_all_dir)
+        df = pd.read_csv(df_all_dir, error_bad_lines=False, warn_bad_lines=True)
+        # Do some checks to remove bad rows
+        df = df[~df['country'].isna()]
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df['bad_date'] = df['date'].isnull()
+        print(f"Found {sum(df['bad_date'])} bad date rows")
+        df = df[~df['bad_date']]
+
+        cols = df.columns
         for key, value in SCHEMA_COLUMNS.items():
-            if value == 'string':
-                df[key] = df[key].astype(str)
-                df[key] = df[key].fillna(pd.NA)
-            elif value == 'int':
-                df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.int32)
-                #df[key] = df[key].fillna(pd.NA)
-            elif value == 'double':
-                df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.float32)
-                #df[key] = df[key].fillna(pd.NA)
-        wr.s3.to_parquet(df, path=f's3://{S3_BUCKET}/datasets/', dataset=True,
+            if key in cols:
+                if value in ['int', 'double']:
+                    df[key] = pd.to_numeric(df[key], errors='coerce')
+
+        for key, value in SCHEMA_COLUMNS.items():
+            if key in df.columns:
+                if value == 'string':
+                    df[key] = df[key].astype(str)
+                    df[key] = df[key].fillna(pd.NA)
+                elif value == 'int':
+                    df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.int32)
+                    #df[key] = df[key].fillna(pd.NA)
+                elif value == 'double':
+                    df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.float32)
+                    #df[key] = df[key].fillna(pd.NA)
+
+        wr.s3.to_parquet(df[OUTPUT_COLS], path=f's3://{S3_BUCKET}/datasets/', dataset=True,
                          dtype=SCHEMA_COLUMNS, mode='overwrite' if full_refresh else 'append',
                          boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
                          partition_cols=['year'])
