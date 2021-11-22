@@ -59,6 +59,7 @@ SCHEMA_COLUMNS = {
     'comment': 'string',
     'country': 'string',
     "course_id": 'int',
+    'race_name': 'string',
     "race_id": 'int',
     "horse_id": 'int',
     "jockey_id": 'int',

@@ -54,40 +54,43 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
 
 
 def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
-    # scheduler2 = BackgroundScheduler()
-    # # Get all files currently in S3
-    # folders = os.listdir(f"{PROJECT_DIR}/{folder}/")
-    # folders = [f for f in folders if 'DS_Store' not in f and '.keep' not in f
-    #            and '.ipynb_checkpoints' not in f]
-    # print(f"Folders found: {folders}")
-    # for country in folders:
-    #     files = os.listdir(f"{PROJECT_DIR}/{folder}/{country}/")
-    #     files = [f for f in files if 'DS_Store' not in f and '.keep' not in f
-    #              and '.ipynb_checkpoints' not in f]
-    #     # Download / Upload the first file manually with overwrite
-    #     filename = f"{PROJECT_DIR}/{folder}/{country}/{files[0]}"
-    #     append_to_pdataset(filename, mode='w', header=True, folder=folder)
-    #     files = files[1:]
-    #     for file in files:
-    #         filename = f"{PROJECT_DIR}/{folder}/{country}/{file}"
-    #         print(filename)
-    #         scheduler2.add_job(func=append_to_pdataset, kwargs={"local_path": filename, "folder": folder},
-    #                            id=f"{country}_{file.split('/')[-1]}", replace_existing=True,
-    #                            misfire_grace_time=999999999)
-    # scheduler2.start()
-    # time.sleep(1)
-    # print(f"Jobs left: {len(scheduler2._pending_jobs)}")
-    # time.sleep(1)
-    # while len(scheduler2._pending_jobs) > 0:
-    #     print(f"Jobs left: {len(scheduler2._pending_jobs)}")
-    # scheduler2.shutdown()
+    scheduler2 = BackgroundScheduler()
+    # Get all files currently in S3
+    folders = os.listdir(f"{PROJECT_DIR}/{folder}/")
+    folders = [f for f in folders if 'DS_Store' not in f and '.keep' not in f
+               and '.ipynb_checkpoints' not in f]
+    print(f"Folders found: {folders}")
+    for country in folders:
+        files = os.listdir(f"{PROJECT_DIR}/{folder}/{country}/")
+        files = [f for f in files if 'DS_Store' not in f and '.keep' not in f
+                 and '.ipynb_checkpoints' not in f]
+        # Download / Upload the first file manually with overwrite
+        filename = f"{PROJECT_DIR}/{folder}/{country}/{files[0]}"
+        append_to_pdataset(filename, mode='w', header=True, folder=folder)
+        files = files[1:]
+        for file in files:
+            filename = f"{PROJECT_DIR}/{folder}/{country}/{file}"
+            print(filename)
+            scheduler2.add_job(func=append_to_pdataset, kwargs={"local_path": filename, "folder": folder},
+                               id=f"{country}_{file.split('/')[-1]}", replace_existing=True,
+                               misfire_grace_time=999999999)
+    scheduler2.start()
+    time.sleep(1)
+    print(f"Jobs left: {len(scheduler2._pending_jobs)}")
+    time.sleep(1)
+    while len(scheduler2._pending_jobs) > 0:
+        print(f"Jobs left: {len(scheduler2._pending_jobs)}")
+    scheduler2.shutdown()
 
     # Upload the dataframe to the /datasets/ directory in S3
     if os.path.exists(df_all_dir):
         df = pd.read_csv(df_all_dir, error_bad_lines=False, warn_bad_lines=True)
+        # Do some checks to remove bad rows
         df = df[~df['country'].isna()]
-        df =df.sort_values('silk_url')
-
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df['bad_date'] = df['date'].isnull()
+        print(f"Found {sum(df['bad_date'])} bad date rows")
+        df = df[~df['bad_date']]
 
         cols = df.columns
         for key, value in SCHEMA_COLUMNS.items():
@@ -106,6 +109,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
                 elif value == 'double':
                     df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.float32)
                     #df[key] = df[key].fillna(pd.NA)
+
         wr.s3.to_parquet(df[OUTPUT_COLS], path=f's3://{S3_BUCKET}/datasets/', dataset=True,
                          dtype=SCHEMA_COLUMNS, mode='overwrite' if full_refresh else 'append',
                          boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
@@ -115,6 +119,4 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 
 if __name__ == '__main__':
     df_all_dir = f"{PROJECT_DIR}/tmp/df_all.csv"
-    # if os.path.exists(df_all_dir):
-    #     os.remove(df_all_dir)
     upload_local_files_to_dataset(full_refresh=False)
