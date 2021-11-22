@@ -8,7 +8,6 @@ import boto3
 
 from apscheduler.schedulers.background import BlockingScheduler
 
-from RPScraper.src.utils.general import upload_csv_to_s3
 from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 use_files_in_s3 = False
