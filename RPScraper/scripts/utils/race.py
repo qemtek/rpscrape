@@ -2,8 +2,7 @@ import sys
 
 from re import search, sub
 
-from pedigree import Pedigree
-
+from utils.pedigree import Pedigree
 from utils.date import convert_date
 from utils.lxml_funcs import find, xpath
 from utils.region import get_region
