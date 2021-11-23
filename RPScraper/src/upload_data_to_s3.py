@@ -65,7 +65,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
         print(f"Loading data for country: {country}")
         files = os.listdir(f"{PROJECT_DIR}/{folder}/{country}/")
         files = [f for f in files if 'DS_Store' not in f and '.keep' not in f
-                 and '.ipynb_checkpoints' not in f]
+                 and '.ipynb_checkpoints' not in f and '.csv' in f]
         print(f"Adding {len(files)} files")
         # Download / Upload the first file manually with overwrite
         filename = f"{PROJECT_DIR}/{folder}/{country}/{files[0]}"
