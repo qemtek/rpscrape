@@ -6,7 +6,6 @@ virtualenv venv
 pip install --upgrade pip
 pip install -r requirements.txt
 # Run daily updates
-export PYTHONPATH=.
 cd RPScraper || exit
 chmod u+x ./scripts/run_daily_updates.sh
 chmod u+x ./scripts/run_rpscrape_script.sh
