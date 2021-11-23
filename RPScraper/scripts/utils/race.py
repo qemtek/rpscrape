@@ -2,11 +2,11 @@ import sys
 
 from re import search, sub
 
-from RPScraper.scripts.utils.pedigree import Pedigree
+from pedigree import Pedigree
 
-from RPScraper.scripts.utils.date import convert_date
-from RPScraper.scripts.utils.lxml_funcs import find, xpath
-from RPScraper.scripts.utils.region import get_region
+from date import convert_date
+from lxml_funcs import find, xpath
+from region import get_region
 
 
 regex_class = '(\(|\s)(C|c)lass (\d|[A-Ha-h])(\)|\s)'
