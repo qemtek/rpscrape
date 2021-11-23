@@ -8,12 +8,12 @@
 Venv/*
 venv/*
 RPScraper/configuration.py
-RPScraper/data/*
+
 RPScraper/s3_data/*
 RPScraper/configuration.py
 RPScraper/scripts/ran_error.html
 
-data/
+
 racecards/
 .idea/
 .vscode/
