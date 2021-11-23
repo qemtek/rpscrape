@@ -18,7 +18,7 @@ df_all_dir = f'{PROJECT_DIR}/tmp/df_all.csv'
 def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
     try:
         if folder == 'data/dates':
-            df = pd.read_csv(local_path,  warn_bad_lines=True, error_bad_lines=False)
+            df = pd.read_csv(local_path,  warn_bad_lines=True, error_bad_lines=False, engine='python')
             cols = df.columns
             for key, value in COL_DTYPES.items():
                 if key in cols:
