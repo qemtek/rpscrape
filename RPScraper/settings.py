@@ -90,7 +90,7 @@ for key, value in SCHEMA_COLUMNS.items():
     COL_DTYPES[key] = get_dtype(value)
 
 
-OUTPUT_COLS = ['id', 'date', 'course', 'off', 'type', 'class', 'pattern', 'rating_band', 'age_band',
+OUTPUT_COLS = ['id', 'date', 'course', 'off', 'race_name', 'type', 'class', 'pattern', 'rating_band', 'age_band',
  'sex_rest', 'dist_m', 'going', 'num', 'pos', 'ran', 'draw', 'btn', 'ovr_btn', 'horse',
  'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
