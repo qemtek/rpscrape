@@ -4,9 +4,9 @@ from re import search, sub
 
 from pedigree import Pedigree
 
-from date import convert_date
-from lxml_funcs import find, xpath
-from region import get_region
+from utils.date import convert_date
+from utils.lxml_funcs import find, xpath
+from utils.region import get_region
 
 
 regex_class = '(\(|\s)(C|c)lass (\d|[A-Ha-h])(\)|\s)'

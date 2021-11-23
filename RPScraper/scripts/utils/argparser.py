@@ -3,9 +3,9 @@ import sys
 
 from argparse import ArgumentParser
 
-from course import *
-from date import *
-from region import *
+from utils.course import *
+from utils.date import *
+from utils.region import *
 
 
 help = (
