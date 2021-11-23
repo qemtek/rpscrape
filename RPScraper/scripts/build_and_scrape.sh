@@ -21,8 +21,8 @@ fi
 
 if [ -z "$2" ]
   then
-    echo "No country argument supplied, running for gb/ire"
-    countries=("gb" "ire")
+    echo "No country argument supplied, running for gb/ire/usa/aus"
+    countries=("gb" "ire" "usa" "aus")
   else
     echo "Country argument supplied, running for {$1}"
     countries=("$1")
