@@ -94,12 +94,14 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
     # Upload the dataframe to the /datasets/ directory in S3
     if os.path.exists(df_all_dir):
         df = pd.read_csv(df_all_dir, error_bad_lines=False, warn_bad_lines=True)
+        print(f"Loaded {len(df)} rows")
         # Do some checks to remove bad rows
         df = df[~df['country'].isna()]
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
         df['bad_date'] = df['date'].isnull()
         print(f"Found {sum(df['bad_date'])} bad date rows")
         df = df[~df['bad_date']]
+        print(f"There are now {len(df)} rows")
 
         cols = df.columns
         for key, value in SCHEMA_COLUMNS.items():
@@ -119,6 +121,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
                     df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.float32)
                     #df[key] = df[key].fillna(pd.NA)
 
+        print(f"Finally uploading {len(df)} rows")
         wr.s3.to_parquet(df[OUTPUT_COLS], path=f's3://{S3_BUCKET}/datasets/', dataset=True,
                          dtype=SCHEMA_COLUMNS, mode='overwrite' if full_refresh else 'append',
                          boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
