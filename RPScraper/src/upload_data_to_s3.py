@@ -131,4 +131,4 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 
 if __name__ == '__main__':
     df_all_dir = f"{PROJECT_DIR}/tmp/df_all.csv"
-    upload_local_files_to_dataset(full_refresh=False)
+    upload_local_files_to_dataset(full_refresh=True)

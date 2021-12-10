@@ -18,4 +18,6 @@ ENV PROJECTSPATH /RPScraper
 
 RUN pip3 install -r requirements.txt
 
+CMD ["FinishTimePredict/ecs_task_launcher.py"]
 ENTRYPOINT ["python"]
+

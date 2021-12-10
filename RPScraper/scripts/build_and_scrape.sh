@@ -30,4 +30,4 @@ fi
 
 echo "Running rpscrape for date: $date"
 
-./scripts/run_daily_updates.sh "${countries[@]}" $date
+./scripts/run_daily_updates.sh "${countries[@]}" "$date"
