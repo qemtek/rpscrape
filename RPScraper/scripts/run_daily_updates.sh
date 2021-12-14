@@ -1,11 +1,16 @@
 #!/bin/bash
+cd RPScraper/scripts
 
-array=( "$@" )
-last_idx=$(( ${#array[@]} - 1 ))
-date=${array[$last_idx]}
-countries=${array[@]::${#array[@]}-1}
+date=$(date +%Y/%m/%d -d "yesterday")
+countries=("gb" "ire" "usa" "aus")
 
-for country in $countries; do
-  echo "Running $country"
-	./scripts/run_rpscrape_script.sh "$date" "$country" || echo "Completed"
+echo "Running rpscrape for date: $date"
+echo "Running rpscrape for countries: $countries"
+for country in ${countries[@]}
+do
+  echo "Running scraper. Date: $date, Country: $country"
+  python3 ./rpscrape.py -d "$date" -r "$country" || echo "Completed"
 done
+
+cd ..
+python src/upload_data_to_s3.py false

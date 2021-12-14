@@ -1,3 +1,6 @@
+import sys
+print(f"Arg supplied to upload_data_to_s3.py: {sys.argv[1]}")
+
 import awswrangler as wr
 import pandas as pd
 import time
@@ -128,7 +131,12 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
                          partition_cols=['year'])
         print(f"Uploaded data to parquet dataset")
 
+        print(f"Uploaded backup dataset to s3://{S3_BUCKET}/datasets/")
+
 
 if __name__ == '__main__':
+    refresh = str(sys.argv[1])
+    refresh = refresh == 'true'
     df_all_dir = f"{PROJECT_DIR}/tmp/df_all.csv"
-    upload_local_files_to_dataset(full_refresh=True)
+    print(f"refresh = {refresh}")
+    upload_local_files_to_dataset(full_refresh=refresh)

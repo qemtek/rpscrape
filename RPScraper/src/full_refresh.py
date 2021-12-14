@@ -2,35 +2,16 @@
 
 import datetime as dt
 import subprocess
-import os
 import awswrangler as wr
-import boto3
 
-from apscheduler.schedulers.background import BlockingScheduler
-
-from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-
-use_files_in_s3 = False
-
-if use_files_in_s3:
-    # Get a list of all files in S3 currently
-    session = boto3.session.Session(aws_access_key_id=AWS_ACCESS_KEY_ID,
-                                    aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
-    folder_dir = f's3://{S3_BUCKET}/data/'
-    files = wr.s3.list_objects(folder_dir, boto3_session=session)
-    file_names = [f.split(folder_dir)[1] for f in files]
-else:
-    file_names = []
-
-# Define scheduler to run jobs
-scheduler = BlockingScheduler()
+from RPScraper.settings import PROJECT_DIR, S3_BUCKET, boto3_session
 
 
 def run_rpscrape(country, date):
     try:
         subprocess.call(f'python ../scripts/rpscrape.py -d {date} -r {country}', shell=True)
         print(f'Finished scraping {country} - {date}')
-        # upload_csv_to_s3(country, date)
+        
     except EOFError:
         pass
 
@@ -50,19 +31,9 @@ for country in countries:
     for i in range(delta.days + 1):
         day = (start_date + dt.timedelta(days=i)).strftime(format='%Y/%m/%d')
         s3_file_name = f"{country}_{str(day).replace('/', '-')}.parquet"
-        local_file_path = f"{PROJECT_DIR}/data/{country}/{str(day).replace('/', '_')}.csv"
+        local_file_path = f"{PROJECT_DIR}/data/dates/{country}/{str(day).replace('/', '_')}.csv"
         print(local_file_path)
-        exists_locally = os.path.exists(local_file_path)
-        exists_remotely = True if s3_file_name in file_names else False
-        if not exists_remotely:
-            if exists_locally:
-                print(f"{country}/{str(day).replace('/', '_')} exists locally but not on S3, uploading local file..")
-            else:
-                scheduler.add_job(id=str(hash(f"{day}_{country}")), func=run_rpscrape, name=f"{country}-{day}",
-                                  kwargs={'country': country, 'date': day}, replace_existing=True,
-                                  misfire_grace_time=99999999999)
-        else:
-            print(f"{s3_file_name} exists remotely")
-
-
-scheduler.start()
+        run_rpscrape(country, day)
+        file_name = local_file_path.split('/')[-1]
+        wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session, path=f"s3://{S3_BUCKET}/data/{file_name}")
+        print(local_file_path)
