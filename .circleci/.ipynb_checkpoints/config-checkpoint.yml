@@ -10,8 +10,6 @@ jobs:
           key: py-deps-{{ checksum "requirements.txt" }}
       - run:
           command: |
-            # Update repo
-            git pull
             # Run scraper
             chmod u+x RPScraper/scripts/build_and_scrape.sh
             ./RPScraper/scripts/build_and_scrape.sh
