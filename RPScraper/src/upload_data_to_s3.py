@@ -3,12 +3,9 @@ print(f"Arg supplied to upload_data_to_s3.py: {sys.argv[1]}")
 
 import awswrangler as wr
 import pandas as pd
-import time
 import os
 import pyarrow
 import numpy as np
-
-from apscheduler.schedulers.background import BackgroundScheduler
 
 from RPScraper.settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE,\
     SCHEMA_COLUMNS, boto3_session, COL_DTYPES, OUTPUT_COLS
@@ -57,7 +54,6 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
 
 
 def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
-    scheduler2 = BackgroundScheduler()
     # Get all files currently in S3
     folders = os.listdir(f"{PROJECT_DIR}/{folder}/")
     folders = [f for f in folders if 'DS_Store' not in f and '.keep' not in f
@@ -83,16 +79,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
         for file in files:
             filename = f"{PROJECT_DIR}/{folder}/{country}/{file}"
             print(filename)
-            scheduler2.add_job(func=append_to_pdataset, kwargs={"local_path": filename, "folder": folder},
-                               id=f"{country}_{file.split('/')[-1]}", replace_existing=True,
-                               misfire_grace_time=999999999)
-    scheduler2.start()
-    time.sleep(1)
-    print(f"Jobs left: {len(scheduler2._pending_jobs)}")
-    time.sleep(1)
-    while len(scheduler2._pending_jobs) > 0:
-        print(f"Jobs left: {len(scheduler2._pending_jobs)}")
-    scheduler2.shutdown()
+            append_to_pdataset(local_path=filename, folder=folder)
 
     # Upload the dataframe to the /datasets/ directory in S3
     if os.path.exists(df_all_dir):
@@ -119,10 +106,8 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
                     df[key] = df[key].fillna(pd.NA)
                 elif value == 'int':
                     df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.int32)
-                    #df[key] = df[key].fillna(pd.NA)
                 elif value == 'double':
                     df.loc[~df[key].isna(), key] = df.loc[~df[key].isna(), key].astype(np.float32)
-                    #df[key] = df[key].fillna(pd.NA)
 
         print(f"Finally uploading {len(df)} rows")
         wr.s3.to_parquet(df[OUTPUT_COLS], path=f's3://{S3_BUCKET}/datasets/', dataset=True,
