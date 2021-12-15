@@ -336,9 +336,9 @@ class Race:
 
         try:
             btn = [self.distance_to_decimal(b) for b in btn]
-        except AttributeError:
-            print('btn error: ', self.url)
-            sys.exit()
+        except AttributeError as e:
+            print(f'btn error: {self.url}, error: {e}')
+            btn = [None]
 
         ovr_btn = [self.distance_to_decimal(b) for b in ovr_btn]
 
@@ -519,9 +519,9 @@ class Race:
         try:
             dist_f = self.distance_to_furlongs(dist)
         except ValueError:
-            print('ERROR: distance_to_furlongs()')
+            print(f'ERROR: distance_to_furlongs(). Error: {ValueError}, dist: {dist}, dist_y: {dist}')
             print('Race: ', self.url)
-            sys.exit()
+            dist_f = -1
 
         dist_m = self.distance_to_metres(dist_y)
 
@@ -592,8 +592,7 @@ class Race:
             else:
                 print('Sex error: ', info_sex)
                 print(self.url)
-                sys.exit()
-
+                sexs.append(None)
         return sexs
     
     def get_starting_prices(self):
@@ -635,16 +634,16 @@ class Race:
             try:
                 winning_time = float(winning_time[0].replace("m", '')) * 60 + float(winning_time[1].strip("s"))
                 winning_time = round(winning_time, 2)
-            except ValueError:
-                print('Winning Time Error: ', self.url)
-                sys.exit()
+            except ValueError as e:
+                print(f'Winning Time Error: {self.url}, error: {e}')
+                winning_time = -1
         else:
             try:
                 winning_time = float(winning_time[0].strip("s"))
                 winning_time = round(winning_time, 2)
-            except ValueError:
-                print('Winning Time Error: ', self.url)
-                sys.exit()
+            except ValueError as e:
+                print(f'Winning Time Error: {self.url}, error: {e}')
+                winning_time = -1
                 
         return winning_time
     

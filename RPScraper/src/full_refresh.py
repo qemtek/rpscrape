@@ -10,7 +10,7 @@ from RPScraper.settings import PROJECT_DIR, S3_BUCKET, boto3_session
 def run_rpscrape(country, date):
     try:
         subprocess.call(f'python ../scripts/rpscrape.py -d {date} -r {country}', shell=True)
-        print(f'Finished scraping {country} - {date}')
+        #print(f'Finished scraping {country} - {date}')
         
     except EOFError:
         pass
@@ -32,11 +32,11 @@ for country in countries:
         day = (start_date + dt.timedelta(days=i)).strftime(format='%Y/%m/%d')
         s3_file_name = f"{country}_{str(day).replace('/', '-')}.parquet"
         local_file_path = f"{PROJECT_DIR}/data/dates/{country}/{str(day).replace('/', '_')}.csv"
-        print(local_file_path)
+        #print(local_file_path)
         try:
             run_rpscrape(country, day)
             file_name = local_file_path.split('/')[-1]
             wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session, path=f"s3://rpscrape/data/{country}/{file_name}")
         except Exception as e:
             print(f"Couldnt get data for {country} on {day}")
-        print(local_file_path)
+        #print(local_file_path)

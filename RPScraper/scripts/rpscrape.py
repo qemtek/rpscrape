@@ -97,7 +97,7 @@ def scrape_races(races, folder_name, file_name, code):
             for row in race.csv_data:
                 csv.write(row + '\n')
 
-        print(f'Finished scraping.\n{file_name}.csv saved in rpscrape/{out_dir.lstrip("../")}')
+        #print(f'Finished scraping.\n{file_name}.csv saved in rpscrape/{out_dir.lstrip("../")}')
 
 
 def main():
