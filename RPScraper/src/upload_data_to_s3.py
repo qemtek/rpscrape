@@ -115,7 +115,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
                          boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
                          partition_cols=['year'])
         print(f"Uploaded data to parquet dataset")
-
+        wr.s3.to_csv(df[OUTPUT_COLS], f's3://rpscrape/data_agg/df_all.csv', boto3_session=boto3_session)
         print(f"Uploaded backup dataset to s3://{S3_BUCKET}/datasets/")
 
 

@@ -33,7 +33,10 @@ for country in countries:
         s3_file_name = f"{country}_{str(day).replace('/', '-')}.parquet"
         local_file_path = f"{PROJECT_DIR}/data/dates/{country}/{str(day).replace('/', '_')}.csv"
         print(local_file_path)
-        run_rpscrape(country, day)
-        file_name = local_file_path.split('/')[-1]
-        wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session, path=f"s3://rpscrape/data/{country}/{file_name}")
+        try:
+            run_rpscrape(country, day)
+            file_name = local_file_path.split('/')[-1]
+            wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session, path=f"s3://rpscrape/data/{country}/{file_name}")
+        except Exception as e:
+            print(f"Couldnt get data for {country} on {day}")
         print(local_file_path)
