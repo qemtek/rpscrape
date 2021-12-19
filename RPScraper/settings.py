@@ -3,6 +3,7 @@ import boto3
 from RPScraper.src.utils.config import get_attribute
 
 PROJECT_DIR = get_attribute('PROJECT_DIR')
+print(f"PROJECT_DIR: {PROJECT_DIR}")
 S3_BUCKET = get_attribute('S3_BUCKET')
 
 AWS_GLUE_DB = get_attribute('AWS_GLUE_DB')
