@@ -1,7 +1,9 @@
 import os.path
 import tomli
 
-from RPScraper.settings import PROJECT_DIR
+from RPScraper.src.utils.config import get_attribute
+PROJECT_DIR = get_attribute('PROJECT_DIR', verbose=False)
+
 
 class Settings:
 
@@ -26,6 +28,11 @@ class Settings:
     def load_toml(self):
         path_default_settings = f'{PROJECT_DIR}/settings/default_settings.toml'
         path_user_settings = f'{PROJECT_DIR}/settings/user_settings.toml'
+
+        if not os.path.exists(path_default_settings):
+            print(f"Path {path_default_settings} does not exist")
+        if not os.path.exists(path_user_settings):
+            print(f"Path {path_user_settings} does not exist")
         
         settings_file = self.open_file(path_user_settings)
         if settings_file is None:
