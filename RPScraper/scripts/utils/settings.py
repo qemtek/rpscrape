@@ -1,6 +1,8 @@
 import os.path
 import tomli
 
+from RPScraper.settings import PROJECT_DIR
+
 class Settings:
 
     def __init__(self):
@@ -22,8 +24,8 @@ class Settings:
         return fields
     
     def load_toml(self):
-        path_default_settings = '../settings/default_settings.toml'
-        path_user_settings = '../settings/user_settings.toml'
+        path_default_settings = f'{PROJECT_DIR}/settings/default_settings.toml'
+        path_user_settings = f'{PROJECT_DIR}/settings/user_settings.toml'
         
         settings_file = self.open_file(path_user_settings)
         if settings_file is None:
@@ -49,3 +51,7 @@ class Settings:
         except tomli.TOMLDecodeError:
             print('TomlParseError: ', settings_file.name)
             return None
+
+
+if __name__ == '__main__':
+    Settings()
