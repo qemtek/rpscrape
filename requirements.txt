@@ -113,11 +113,11 @@ virtualenv==20.3.1
     # via tox
 zipp==3.4.0
     # via importlib-metadata
-aiohttp
-lxml
-orjson
-requests
-tomli
+aiohttp==3.8.1
+lxml==4.5.0
+orjson==3.6.4
+requests==2.23.0
+tomli==1.2.2
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
