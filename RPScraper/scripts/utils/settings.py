@@ -5,8 +5,8 @@ class Settings:
 
     def __init__(self):
         self.toml = self.load_toml()
-        if self.toml is None: return
-        
+        if self.toml is None:
+            return
         self.fields = self.get_fields()
         self.csv_header = ','.join([field for field in self.fields])
         
