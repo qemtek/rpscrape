@@ -4,7 +4,7 @@ import datetime as dt
 import subprocess
 import awswrangler as wr
 
-from RPScraper.settings import PROJECT_DIR, S3_BUCKET, boto3_session
+from RPScraper.settings import PROJECT_DIR, boto3_session
 
 
 def run_rpscrape(country, date):
@@ -21,7 +21,7 @@ end_date = date_today - dt.timedelta(days=1)
 print(f"End date: {end_date}")
 
 # Get the countries we want
-countries = ["usa", "ire", "gb", "aus"]
+countries = ["ire", "gb", "aus", "usa"]
 # Find the number of days between the start and end dates
 delta = end_date - start_date
 dates = list()
@@ -35,6 +35,7 @@ for country in countries:
         try:
             run_rpscrape(country, day)
             file_name = local_file_path.split('/')[-1]
-            wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session, path=f"s3://rpscrape/data/{country}/{file_name}")
+            wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session,
+                         path=f"s3://rpscrape/data/{country}/{file_name}")
         except Exception as e:
             print(f"Couldnt get data for {country} on {day}")
