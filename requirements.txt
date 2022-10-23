@@ -121,3 +121,9 @@ tomli==1.2.2
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
+aiohttp~=3.8
+lxml~=4.7
+orjson~=3.6
+requests~=2.26
+tomli~=2.0
+

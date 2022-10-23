@@ -169,7 +169,7 @@ To scrape a particular course or region, use the -c or -r flags with the course 
 ```
 
 ## Scrape Racecards
-You can scrape racecards for today or tomorrow, using racecards.py which saves a file containing a json object of racecard information.
+You can scrape racecards using racecards.py which saves a file containing a json object of racecard information.
 
 ### Examples
 There are only two parameter options, either `today` or `tomorrow`.
@@ -178,7 +178,7 @@ There are only two parameter options, either `today` or `tomorrow`.
 ./racecards.py today
 ```
 
-You can see the outer structure of the json and some of the race information below.
+You can see the structure of the json and some of the race information below.
 
 ![json1](https://i.postimg.cc/Y2ZNmLh5/json.png)
 
@@ -187,7 +187,7 @@ You can see the outer structure of the json and some of the race information bel
 
 ### Settings
 
-The [user_settings.toml](https://github.com/joenano/rpscrape/blob/master/user_settings.toml) file contains the data fields that can be scraped. You can turn fields on and off by setting them true or false. The order of fields in that file will be the maintained in the output csv. The [default_settings.toml](https://github.com/joenano/rpscrape/blob/master/default_settings.toml) file should not be edited, its there as a backup and to introduce any new fields without changing user settings.
+The [user_settings.toml](https://github.com/joenano/rpscrape/blob/master/user_settings.toml) file contains the data fields that can be scraped. You can turn fields on and off by setting them true or false. The order of fields in that file will be maintained in the output csv. The [default_settings.toml](https://github.com/joenano/rpscrape/blob/master/default_settings.toml) file should not be edited, its there as a backup and to introduce any new fields without changing user settings.
 
 ![settings](https://i.postimg.cc/sDhG3SQT/settings.png)
 
@@ -211,6 +211,3 @@ q, quit, exit       Quit
 ```
 
 Tab complete for option keywords is available on Linux.
-
-
-[![Stargazers over time](https://starchart.cc/joenano/rpscrape.svg)](https://starchart.cc/joenano/rpscrape)

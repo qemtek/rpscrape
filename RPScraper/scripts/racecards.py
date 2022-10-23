@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import asyncio
 import os
 import requests
 import sys
@@ -10,9 +9,20 @@ from lxml import html
 from orjson import loads, dumps
 from re import search
 
-from utils.async_funcs import get_documents
+from utils.going import get_surface
+from utils.header import RandomHeader
 from utils.lxml_funcs import find
 from utils.region import get_region
+
+
+random_header = RandomHeader()
+
+
+def clean_name(name):
+    if name:
+        return name.strip().replace("'", '').lower().title()
+    else:
+        return ''
 
 
 def distance_to_furlongs(distance):
@@ -30,7 +40,7 @@ def distance_to_furlongs(distance):
 
 
 def get_going_info(session, date):
-    r = session.get('https://www.racingpost.com/non-runners/' + date)
+    r = session.get(f'https://www.racingpost.com/non-runners/{date}', headers=random_header.header())
     doc = html.fromstring(r.content.decode())
 
     json_str = doc.xpath('//body/script')[0].text.replace('var __PRELOADED_STATE__ = ', '').strip().strip(';')
@@ -39,8 +49,18 @@ def get_going_info(session, date):
 
     for course in loads(json_str):
         going, rail_movements = parse_going(course['going'])
-        course_id = int(course['raceCardsCourseMeetingsUrl'].split('/')[2])
-        going_info[course_id]['course'] = course['courseName']
+
+        course_id = 0
+        course_name = ''
+
+        if course['courseName'] == 'Belmont At The Big A':
+            course_id = 255
+            course_name = 'Aqueduct'
+        else:
+            course_id = int(course['raceCardsCourseMeetingsUrl'].split('/')[2])
+            course_name = course['courseName']
+
+        going_info[course_id]['course'] = course_name
         going_info[course_id]['going'] = going
         going_info[course_id]['stalls'] = course['stallsPosition']
         going_info[course_id]['rail_movements'] = rail_movements
@@ -59,12 +79,37 @@ def get_pattern(race_name):
 
     if any(x in race_name.lower() for x in {'listed race', '(listed'}):
         return 'Listed'
-    
+
     return ''
 
 
+def get_race_type(doc, race, distance):
+        race_type = ''
+        fences = find(doc, 'div', 'RC-headerBox__stalls')
+
+        if 'hurdle' in fences.lower():
+            race_type = 'Hurdle'
+        elif 'fence' in fences.lower():
+            race_type = 'Chase'
+        else:
+            if distance >= 12:
+                if any(x in race for x in {'national hunt flat', 'nh flat race', 'mares flat race'}):
+                    race_type = 'NH Flat'
+                if any(x in race for x in {'inh bumper', ' sales bumper', 'kepak flat race', 'i.n.h. flat race'}):
+                    race_type = 'NH Flat'
+                if any(x in race for x in {' hurdle', '(hurdle)'}):
+                    race_type = 'Hurdle'
+                if any(x in race for x in {' chase', '(chase)', 'steeplechase', 'steeple-chase', 'steeplchase', 'steepl-chase'}):
+                    race_type = 'Chase'
+
+        if race_type == '':
+            race_type = 'Flat'
+
+        return race_type
+
+
 def get_race_urls(session, racecard_url):
-    r = session.get(racecard_url)
+    r = session.get(racecard_url, headers=random_header.header())
     doc = html.fromstring(r.content)
 
     race_urls = []
@@ -78,27 +123,28 @@ def get_race_urls(session, racecard_url):
     return sorted(list(set(race_urls)))
 
 
-def get_runners(profile_urls, race_id):
+def get_runners(session, profile_urls):
     runners = {}
 
-    docs = asyncio.run(get_documents(profile_urls))
+    for url in profile_urls:
+        r = session.get(url, headers=random_header.header())
+        doc = html.fromstring(r.content)
 
-    for doc in docs:
         runner = {}
-        
+
         try:
-            json_str = doc[1].xpath('//body/script')[0].text.split('window.PRELOADED_STATE =')[1].split('})()')[0].strip().strip(';')
+            json_str = doc.xpath('//body/script')[0].text.split('window.PRELOADED_STATE =')[1].split('\n')[0].strip().strip(';')
             js = loads(json_str)
         except IndexError:
-            split = doc[0].split('/')
+            split = url.split('/')
             runner['horse_id'] = int(split[5])
             runner['name'] = split[6].replace('-', ' ').title()
-            runner['broken_url'] = doc[0]
+            runner['broken_url'] = url
             runners[runner['horse_id']] = runner
             continue
 
         runner['horse_id'] = js['profile']['horseUid']
-        runner['name'] = js['profile']['horseName']
+        runner['name'] = clean_name(js['profile']['horseName'])
         runner['dob'] = js['profile']['horseDateOfBirth'].split('T')[0]
         runner['age'] = int(js['profile']['age'].split('-')[0])
         runner['sex'] = js['profile']['horseSex']
@@ -107,19 +153,19 @@ def get_runners(profile_urls, race_id):
         runner['region'] = js['profile']['horseCountryOriginCode']
 
         runner['breeder'] = js['profile']['breederName']
-        runner['dam'] = js['profile']['damHorseName']
+        runner['dam'] = clean_name(js['profile']['damHorseName'])
         runner['dam_region'] = js['profile']['damCountryOriginCode']
-        runner['sire'] = js['profile']['sireHorseName']
+        runner['sire'] = clean_name(js['profile']['sireHorseName'])
         runner['sire_region'] = js['profile']['sireCountryOriginCode']
-        runner['grandsire'] = js['profile']['siresSireName']
-        runner['damsire'] = js['profile']['damSireHorseName']
+        runner['grandsire'] = clean_name(js['profile']['siresSireName'])
+        runner['damsire'] = clean_name(js['profile']['damSireHorseName'])
         runner['damsire_region'] = js['profile']['damSireCountryOriginCode']
 
-        runner['trainer'] = js['profile']['trainerName']
+        runner['trainer'] = clean_name(js['profile']['trainerName'])
         runner['trainer_location'] = js['profile']['trainerLocation']
         runner['trainer_14_days'] = js['profile']['trainerLast14Days']
 
-        runner['owner'] = js['profile']['ownerName']
+        runner['owner'] = clean_name(js['profile']['ownerName'])
 
         runner['prev_trainers'] = js['profile']['previousTrainers']
 
@@ -219,23 +265,29 @@ def parse_going(going_info):
     return going, rail_movements
 
 
-def parse_races(session, race_docs, date):
+def parse_races(session, race_urls, date):
     races = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
 
     going_info = get_going_info(session, date)
 
-    for race_doc in race_docs:
-        url, doc = race_doc
-        if doc is None: continue
-        
+    for url in race_urls:
+        r = session.get(url, headers=random_header.header())
+        doc = html.fromstring(r.content)
+
         race = {}
 
         url_split = url.split('/')
-        
+
+        race['course'] = find(doc, 'h1', 'RC-courseHeader__name')
+
+        if race['course'] == 'Belmont At The Big A':
+            race['course_id'] = 255
+            race['course'] = 'Aqueduct'
+        else:
+            race['course_id'] = int(url_split[4])
+
         race['race_id'] = int(url_split[7])
         race['date'] = url_split[6]
-        race['course_id'] = int(url_split[4])
-        race['course'] = find(doc, 'h1', 'RC-courseHeader__name')
         race['off_time'] = find(doc, 'span', 'RC-courseHeader__time')
         race['race_name'] = find(doc, 'span', 'RC-header__raceInstanceTitle')
         race['distance_round'] = find(doc, 'strong', 'RC-header__raceDistanceRound')
@@ -243,10 +295,15 @@ def parse_races(session, race_docs, date):
         race['distance'] = race['distance_round'] if not race['distance'] else race['distance'].strip('()')
         race['distance_f'] = distance_to_furlongs(race['distance_round'])
         race['region'] = get_region(str(race['course_id']))
-        race['race_class'] = find(doc, 'span', 'RC-header__raceClass')
-        race['race_class'] = race['race_class'].strip('()') if race['race_class'] else None
         race['pattern'] = get_pattern(race['race_name'].lower())
-        
+        race['race_class'] = find(doc, 'span', 'RC-header__raceClass')
+        race['race_class'] = race['race_class'].strip('()') if race['race_class'] else ''
+        race['type'] = get_race_type(doc, race['race_name'].lower(), race['distance_f'])
+
+        if not race['race_class']:
+            if race['pattern']:
+                race['race_class'] = 'Class 1'
+
         try:
             band = find(doc, 'span', 'RC-header__rpAges').strip('()').split()
             if band:
@@ -281,10 +338,12 @@ def parse_races(session, race_docs, date):
         going = find(doc, 'div', 'RC-headerBox__going').lower()
         race['going'] = going.split('going:')[1].strip().title() if 'going:' in going else ''
 
+        race['surface'] = get_surface(race['going'])
+
         profile_hrefs = doc.xpath("//a[@data-test-selector='RC-cardPage-runnerName']/@href")
         profile_urls = ['https://www.racingpost.com' + a.split('#')[0] + '/form' for a in profile_hrefs]
 
-        runners = get_runners(profile_urls, race['race_id'])
+        runners = get_runners(session, profile_urls)
 
         for horse in doc.xpath("//div[contains(@class, ' js-PC-runnerRow')]"):
             horse_id = int(find(horse, 'a', 'RC-cardPage-runnerName', attrib='href').split('/')[3])
@@ -293,35 +352,38 @@ def parse_races(session, race_docs, date):
                 sire = find(horse, 'a', 'RC-pedigree__sire').split('(')
                 dam = find(horse, 'a', 'RC-pedigree__dam').split('(')
                 damsire = find(horse, 'a', 'RC-pedigree__damsire').lstrip('(').rstrip(')').split('(')
-                
-                runners[horse_id]['sire'] = sire[0].strip()
-                runners[horse_id]['dam'] = dam[0].strip()
-                runners[horse_id]['damsire'] = damsire[0].strip()
-                
+
+                runners[horse_id]['sire'] = clean_name(sire[0])
+                runners[horse_id]['dam'] = clean_name(dam[0])
+                runners[horse_id]['damsire'] = clean_name(damsire[0])
+
                 runners[horse_id]['sire_region'] = sire[1].replace(')', '').strip()
                 runners[horse_id]['dam_region'] = dam[1].replace(')', '').strip()
                 runners[horse_id]['damsire_region'] = damsire[1].replace(')', '').strip()
-                
+
                 runners[horse_id]['age'] = find(horse, 'span', 'RC-cardPage-runnerAge', attrib='data-order-age')
-                
+
                 sex = find(horse, 'span', 'RC-pedigree__color-sex').split()
-                
+
                 runners[horse_id]['colour'] = sex[0]
                 runners[horse_id]['sex_code'] = sex[1].capitalize()
-                
+
                 runners[horse_id]['trainer'] = find(horse, 'a', 'RC-cardPage-runnerTrainer-name', attrib='data-order-trainer')
-            
+
             runners[horse_id]['number'] = int(find(horse, 'span', 'RC-cardPage-runnerNumber-no', attrib='data-order-no'))
-            
+
             try:
                 runners[horse_id]['draw'] = int(find(horse, 'span', 'RC-cardPage-runnerNumber-draw', attrib='data-order-draw'))
             except ValueError:
                 runners[horse_id]['draw'] = None
-                
+
             runners[horse_id]['headgear'] = find(horse, 'span', 'RC-cardPage-runnerHeadGear')
             runners[horse_id]['headgear_first'] = find(horse, 'span', 'RC-cardPage-runnerHeadGear-first')
 
-            runners[horse_id]['lbs'] = int(find(horse, 'span', 'RC-cardPage-runnerWgt-carried', attrib='data-order-wgt'))
+            try:
+                runners[horse_id]['lbs'] = int(find(horse, 'span', 'RC-cardPage-runnerWgt-carried', attrib='data-order-wgt'))
+            except ValueError:
+                runners[horse_id]['lbs'] = None
 
             try:
                 runners[horse_id]['ofr'] = int(find(horse, 'span', 'RC-cardPage-runnerOr', attrib='data-order-or'))
@@ -345,7 +407,7 @@ def parse_races(session, race_docs, date):
                 runners[horse_id]['jockey'] = jockey if not claim else jockey + f'({claim})'
             else:
                 runners[horse_id]['jockey'] = None
-            
+
             try:
                 runners[horse_id]['last_run'] = find(horse, 'div', 'RC-cardPage-runnerStats-lastRun')
             except TypeError:
@@ -372,9 +434,6 @@ def valid_course(course):
 def main():
     if len(sys.argv) != 2 or sys.argv[1].lower() not in {'today', 'tomorrow'}:
         return print('Usage: ./racecards.py [today|tomorrow]')
-    
-    if sys.version_info[0] == 3 and sys.version_info[1] >= 7 and sys.platform.startswith('win'):
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     racecard_url = 'https://www.racingpost.com/racecards'
 
@@ -385,18 +444,14 @@ def main():
         date = (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')
 
     session = requests.Session()
-    session.headers.update({'User-Agent': 'Mozilla/5.0'})
 
     race_urls = get_race_urls(session, racecard_url)
-
-    race_docs = asyncio.run(get_documents(race_urls))
-
-    races = parse_races(session, race_docs, date)
+    races = parse_races(session, race_urls, date)
 
     if not os.path.exists('../racecards'):
         os.makedirs(f'../racecards')
 
-    with open(f'../racecards/{date}.json', 'w') as f:
+    with open(f'../racecards/{date}.json', 'w', encoding='utf-8') as f:
         f.write(dumps(races).decode('utf-8'))
 
 
