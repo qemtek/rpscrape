@@ -5,7 +5,7 @@ import sys
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from lxml import html
+from lxml import etree, html
 from orjson import loads, dumps
 from re import search
 
@@ -70,7 +70,7 @@ def get_going_info(session, date):
 
 
 def get_pattern(race_name):
-    regex_group = '(\(|\s)((G|g)rade|(G|g)roup) (\d|[A-Ca-c]|I*)(\)|\s)'
+    regex_group = r'(\(|\s)((G|g)rade|(G|g)roup) (\d|[A-Ca-c]|I*)(\)|\s)'
     match = search(regex_group, race_name)
 
     if match:
@@ -143,10 +143,15 @@ def get_runners(session, profile_urls):
             runners[runner['horse_id']] = runner
             continue
 
+        try:
+            runner['age'] = int(js['profile']['age'].split('-')[0])
+        except ValueError:
+            age = js['profile']['age'].replace('Died as a', '')
+            runner['age'] = int(age.split('-')[0])
+
         runner['horse_id'] = js['profile']['horseUid']
         runner['name'] = clean_name(js['profile']['horseName'])
         runner['dob'] = js['profile']['horseDateOfBirth'].split('T')[0]
-        runner['age'] = int(js['profile']['age'].split('-')[0])
         runner['sex'] = js['profile']['horseSex']
         runner['sex_code'] = js['profile']['horseSexCode']
         runner['colour'] = js['profile']['horseColour']
@@ -162,6 +167,7 @@ def get_runners(session, profile_urls):
         runner['damsire_region'] = js['profile']['damSireCountryOriginCode']
 
         runner['trainer'] = clean_name(js['profile']['trainerName'])
+        runner['trainer_id'] = js['profile']['trainerUid']
         runner['trainer_location'] = js['profile']['trainerLocation']
         runner['trainer_14_days'] = js['profile']['trainerLast14Days']
 
@@ -271,8 +277,18 @@ def parse_races(session, race_urls, date):
     going_info = get_going_info(session, date)
 
     for url in race_urls:
-        r = session.get(url, headers=random_header.header())
-        doc = html.fromstring(r.content)
+        r = session.get(url, headers=random_header.header(), allow_redirects=False)
+
+        if r.status_code != 200:
+            print('Failed to get racecard.')
+            print(f'URL: {url}')
+            print(f'Response: {r.status_code}')
+            continue
+
+        try:
+            doc = html.fromstring(r.content)
+        except etree.ParserError:
+            continue
 
         race = {}
 
@@ -401,12 +417,15 @@ def parse_races(session, race_urls, date):
                 runners[horse_id]['ts'] = None
 
             claim = find(horse, 'span', 'RC-cardPage-runnerJockey-allowance')
-            jockey = find(horse, 'a', 'RC-cardPage-runnerJockey-name', attrib='data-order-jockey')
+            jockey = horse.find('.//a[@data-test-selector="RC-cardPage-runnerJockey-name"]')
 
-            if jockey:
-                runners[horse_id]['jockey'] = jockey if not claim else jockey + f'({claim})'
+            if jockey is not None:
+                jock = jockey.attrib['data-order-jockey']
+                runners[horse_id]['jockey'] = jock if not claim else jock + f'({claim})'
+                runners[horse_id]['jockey_id'] = int(jockey.attrib['href'].split('/')[3])
             else:
                 runners[horse_id]['jockey'] = None
+                runners[horse_id]['jockey_id'] = None
 
             try:
                 runners[horse_id]['last_run'] = find(horse, 'div', 'RC-cardPage-runnerStats-lastRun')

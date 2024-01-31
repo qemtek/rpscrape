@@ -1,22 +1,32 @@
-#!/usr/bin/env python3
-
-import asyncio
+import gzip
+import requests
 import os
 import sys
 
+from dataclasses import dataclass
+
+from lxml import html
 from orjson import loads
 
 from utils.argparser import ArgParser
 from utils.completer import Completer
+from utils.header import RandomHeader
 from utils.race import Race, VoidRaceError
 from utils.settings import Settings
 from utils.update import Update
 
-from utils.async_funcs import get_documents, get_jsons
 from utils.course import course_name, courses
 from utils.lxml_funcs import xpath
 
 settings = Settings()
+random_header = RandomHeader()
+
+
+@dataclass
+class RaceList:
+    course_id: str
+    course_name: str
+    url: str
 
 
 def check_for_update():
@@ -24,8 +34,7 @@ def check_for_update():
 
     if update.available():
         choice = input('Update available. Do you want to update? Y/N ')
-        if choice.lower() != 'y':
-            return
+        if choice.lower() != 'y': return
 
         if update.pull_latest():
             print('Updated successfully.')
@@ -37,23 +46,26 @@ def check_for_update():
 
 def get_race_urls(tracks, years, code):
     urls = set()
-    courses = []
 
-    course_url = 'https://www.racingpost.com:443/profile/course/filter/results'
-    result_url = 'https://www.racingpost.com/results'
+    url_course = 'https://www.racingpost.com:443/profile/course/filter/results'
+    url_result = 'https://www.racingpost.com/results'
+
+    race_lists = []
 
     for track in tracks:
         for year in years:
-            courses.append((track, f'{course_url}/{track [0]}/{year}/{code}/all-races'))
+            race_list = RaceList(*track, f'{url_course}/{track[0].lower()}/{year}/{code}/all-races')
+            race_lists.append(race_list)
 
-    races = asyncio.run(get_jsons(courses))
+    for race_list in race_lists:
+        r = requests.get(race_list.url, headers=random_header.header())
+        races = loads(r.text)['data']['principleRaceResults']
 
-    for race in races:
-        results = loads(race [1]) ['data'] ['principleRaceResults']
-
-        if results:
-            for result in results:
-                url = f'{result_url}/{race [0] [0]}/{race [0] [1]}/{result ["raceDatetime"] [:10]}/{result ["raceInstanceUid"]}'
+        if races:
+            for race in races:
+                race_date = race["raceDatetime"][:10]
+                race_id = race["raceInstanceUid"]
+                url = f'{url_result}/{race_list.course_id}/{race_list.course_name}/{race_date}/{race_id}'
                 urls.add(url.replace(' ', '-').replace("'", ''))
 
     return sorted(list(urls))
@@ -63,57 +75,74 @@ def get_race_urls_date(dates, region):
     urls = set()
 
     days = [f'https://www.racingpost.com/results/{d}' for d in dates]
-    docs = asyncio.run(get_documents(days))
 
-    course_ids = {course [0] for course in courses(region)}
+    course_ids = {course[0] for course in courses(region)}
 
-    for doc in docs:
-        race_links = xpath(doc [1], 'a', 'link-listCourseNameLink')
+    for day in days:
+        r = requests.get(day, headers=random_header.header())
+        doc = html.fromstring(r.content)
 
-        for race in race_links:
-            if race.attrib ['href'].split('/') [2] in course_ids:
-                urls.add('https://www.racingpost.com' + race.attrib ['href'])
+        races = xpath(doc, 'a', 'link-listCourseNameLink')
+
+        for race in races:
+            if race.attrib['href'].split('/')[2] in course_ids:
+                urls.add('https://www.racingpost.com' + race.attrib['href'])
 
     return sorted(list(urls))
 
 
-def scrape_races(races, folder_name, file_name, code):
+def scrape_races(races, folder_name, file_name, file_extension, code, file_writer):
     out_dir = f'../data/{folder_name}/{code}'
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    with open(f'{out_dir}/{file_name}.csv', 'w', encoding = 'utf-8') as csv:
+    file_path = f'{out_dir}/{file_name}.{file_extension}'
+
+    with file_writer(file_path) as csv:
         csv.write(settings.csv_header + '\n')
 
-        docs = asyncio.run(get_documents(races))
+        for url in races:
+            r = requests.get(url, headers=random_header.header())
+            doc = html.fromstring(r.content)
 
-        for doc in docs:
             try:
-                race = Race(doc, code, settings.fields)
+                race = Race(url, doc, code, settings.fields)
             except VoidRaceError:
                 continue
 
             for row in race.csv_data:
                 csv.write(row + '\n')
 
-        #print(f'Finished scraping.\n{file_name}.csv saved in rpscrape/{out_dir.lstrip("../")}')
+        print(f'Finished scraping.\n{file_name}.{file_extension} saved in rpscrape/{out_dir.lstrip("../")}')
+
+
+def writer_csv(file_path):
+    return open(file_path, 'w', encoding='utf-8')
+
+
+def writer_gzip(file_path):
+    return gzip.open(file_path, 'wt', encoding='utf-8')
 
 
 def main():
     if settings.toml is None:
         sys.exit()
 
-    if settings.toml ['auto_update']:
+    if settings.toml['auto_update']:
         check_for_update()
 
-    if sys.version_info [0] == 3 and sys.version_info [1] >= 7 and sys.platform.startswith('win'):
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    file_extension = 'csv'
+    file_writer = writer_csv
+
+    if settings.toml.get('gzip_output', False):
+        file_extension = 'csv.gz'
+        file_writer = writer_gzip
 
     parser = ArgParser()
 
     if len(sys.argv) > 1:
-        args = parser.parse_args(sys.argv [1:])
+        args = parser.parse_args(sys.argv[1:])
 
         if args.date:
             folder_name = 'dates/' + args.region
@@ -124,7 +153,7 @@ def main():
             file_name = args.year
             races = get_race_urls(parser.tracks, parser.years, args.type)
 
-        scrape_races(races, folder_name, file_name, args.type)
+        scrape_races(races, folder_name, file_name, file_extension, args.type, file_writer)
     else:
         if sys.platform == 'linux':
             import readline
@@ -135,15 +164,14 @@ def main():
         while True:
             args = input('[rpscrape]> ').lower().strip()
             args = parser.parse_args_interactive([arg.strip() for arg in args.split()])
-            print(args)
 
             if args:
                 if 'dates' in args:
-                    races = get_race_urls_date(args ['dates'], args ['region'])
+                    races = get_race_urls_date(args['dates'], args['region'])
                 else:
-                    races = get_race_urls(args ['tracks'], args ['years'], args ['type'])
+                    races = get_race_urls(args['tracks'], args['years'], args['type'])
 
-                scrape_races(races, args ['folder_name'], args ['file_name'], args ['type'])
+                scrape_races(races, args['folder_name'], args['file_name'], file_extension, args['type'], file_writer)
 
 
 if __name__ == '__main__':
