@@ -11,7 +11,6 @@ jobs:
       - run:
           command: |
             # Run scraper
-            ls ;
             export PYTHONPATH=RPScraper ;
             pip install --upgrade pip ; 
             pip install -r requirements.txt ;
@@ -30,4 +29,10 @@ workflows:
     jobs:
       - build-and-scrape:
           context: aws
-
+    triggers:
+      - schedule:
+          cron: "0 9 * * *"
+          filters:
+            branches:
+              only:
+                - master
