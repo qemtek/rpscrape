@@ -4,6 +4,7 @@ countries=("gb" "ire" "usa" "aus")
 
 echo "Running rpscrape for date: $date"
 echo "Running rpscrape for countries: "
+ls
 echo "${countries[@]}"
 
 for country in "${countries[@]}"
