@@ -7,7 +7,7 @@ import os
 import pyarrow
 import numpy as np
 
-from settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE,\
+from settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_RPSCRAPE_TABLE_NAME,\
     SCHEMA_COLUMNS, boto3_session, COL_DTYPES, OUTPUT_COLS
 from utils.general import clean_data
 
@@ -112,7 +112,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
         print(f"Finally uploading {len(df)} rows")
         wr.s3.to_parquet(df[OUTPUT_COLS], path=f's3://{S3_BUCKET}/datasets/', dataset=True,
                          dtype=SCHEMA_COLUMNS, mode='overwrite' if full_refresh else 'append',
-                         boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_GLUE_TABLE,
+                         boto3_session=boto3_session, database=AWS_GLUE_DB, table=AWS_RPSCRAPE_TABLE_NAME,
                          partition_cols=['year'])
         print(f"Uploaded data to parquet dataset")
         wr.s3.to_csv(df[OUTPUT_COLS], f's3://rpscrape/data_agg/df_all.csv', boto3_session=boto3_session)
