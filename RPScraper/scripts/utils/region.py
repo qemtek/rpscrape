@@ -21,7 +21,7 @@ def print_regions():
 
 
 def regions():
-    return loads(open('../courses/_regions', 'r').read())
+    return loads(open('courses/_regions', 'r').read())
 
 
 def region_search(term):

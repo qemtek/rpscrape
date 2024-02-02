@@ -467,10 +467,10 @@ def main():
     race_urls = get_race_urls(session, racecard_url)
     races = parse_races(session, race_urls, date)
 
-    if not os.path.exists('../racecards'):
-        os.makedirs(f'../racecards')
+    if not os.path.exists('racecards'):
+        os.makedirs(f'racecards')
 
-    with open(f'../racecards/{date}.json', 'w', encoding='utf-8') as f:
+    with open(f'racecards/{date}.json', 'w', encoding='utf-8') as f:
         f.write(dumps(races).decode('utf-8'))
 
 
