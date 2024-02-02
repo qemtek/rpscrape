@@ -1,8 +1,9 @@
 import boto3
+import os
 
 from utils.config import get_attribute
 
-PROJECT_DIR = get_attribute('PROJECT_DIR')
+PROJECT_DIR =  os.path.dirname(os.path.abspath(__file__))
 print(f"PROJECT_DIR: {PROJECT_DIR}")
 S3_BUCKET = get_attribute('S3_BUCKET')
 

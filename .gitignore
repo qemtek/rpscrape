@@ -7,10 +7,10 @@
 *.DS_Store
 Venv/*
 venv/*
-RPScraper/scripts/configuration.py
+RPScraper/configuration.py
 
 RPScraper/s3_data/*
-RPScraper/scripts/configuration.py
+RPScraper/configuration.py
 RPScraper/scripts/ran_error.html
 
 
