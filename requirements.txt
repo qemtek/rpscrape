@@ -6,10 +6,9 @@ charset-normalizer==3.3.2
 idna==3.6
 jmespath==1.0.1
 lxml==5.1.0
-numpy==1.26.3
 orjson==3.9.12
 packaging==23.2
-pandas==2.2.0
+pandas==2.*
 pyarrow==15.0.0
 python-dateutil==2.8.2
 pytz==2023.4
