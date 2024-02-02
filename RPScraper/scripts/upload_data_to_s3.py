@@ -55,20 +55,20 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
 
 def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
     # Get all files currently in S3
-    folders = os.listdir(f"RPScraper/{folder}/")
+    folders = os.listdir(f"{folder}/")
     folders = [f for f in folders if 'DS_Store' not in f and '.keep' not in f
                and '.ipynb_checkpoints' not in f]
     print(f"Folders found: {folders}")
     first_row = True
     for country in folders:
         print(f"Loading data for country: {country}")
-        files = os.listdir(f"RPScraper/{folder}/{country}/")
+        files = os.listdir(f"{folder}/{country}/")
         files = [f for f in files if 'DS_Store' not in f and '.keep' not in f
                  and '.ipynb_checkpoints' not in f and '.csv' in f]
         print(f"Adding {len(files)} files")
         assert len(files) > 0, 'There are no files to upload'
         # Download / Upload the first file manually with overwrite
-        filename = f"RPScraper/{folder}/{country}/{files[0]}"
+        filename = f"{folder}/{country}/{files[0]}"
         if first_row:
             append_to_pdataset(filename, mode='w', header=True, folder=folder)
             first_row = False
@@ -77,7 +77,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
             start = 0
         files = files[start:]
         for file in files:
-            filename = f"RPScraper/{folder}/{country}/{file}"
+            filename = f"{folder}/{country}/{file}"
             print(filename)
             append_to_pdataset(local_path=filename, folder=folder)
 
@@ -122,6 +122,6 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 if __name__ == '__main__':
     refresh = str(sys.argv[1])
     refresh = refresh == 'true'
-    df_all_dir = f"RPScraper/tmp/df_all.csv"
+    df_all_dir = f"tmp/df_all.csv"
     print(f"refresh = {refresh}")
     upload_local_files_to_dataset(full_refresh=refresh)
