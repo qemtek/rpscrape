@@ -11,6 +11,7 @@ jobs:
       - run:
           command: |
             # Run scraper
+            ls ;
             export PYTHONPATH=RPScraper ;
             pip install --upgrade pip ; 
             pip install -r requirements.txt ;
