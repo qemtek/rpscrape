@@ -9,7 +9,7 @@ echo "${countries[@]}"
 for country in "${countries[@]}"
 do
   echo "Running scraper. Date: $date, Country: $country"
-  python3 ./rpscrape.py -d "$date" -r "$country" || echo "Completed"
+  python3 rpscrape.py -d "$date" -r "$country" || echo "Completed"
 done
 
 export PYTHONPATH=..
