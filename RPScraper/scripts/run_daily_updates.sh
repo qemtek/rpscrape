@@ -14,5 +14,4 @@ do
   python3 ./rpscrape.py -d "$date" -r "$country" || echo "Completed"
 done
 
-cd ..
-python src/upload_data_to_s3.py false
+python upload_data_to_s3.py false

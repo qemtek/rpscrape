@@ -9,7 +9,7 @@ import numpy as np
 
 from settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE,\
     SCHEMA_COLUMNS, boto3_session, COL_DTYPES, OUTPUT_COLS
-from src.utils.general import clean_data
+from utils.general import clean_data
 
 
 df_all_dir = f'{PROJECT_DIR}/tmp/df_all.csv'
