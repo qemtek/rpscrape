@@ -4,7 +4,7 @@ import datetime as dt
 import pandas as pd
 import subprocess
 
-from RPScraper.settings import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from settings import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 DATABASE = 'finish-time-predict'
 
@@ -40,9 +40,6 @@ def run_rpscrape(country, date):
     subprocess.call(f'python3 ../scripts/rpscrape.py -d {date} -c {country}', shell=True)
     print(f'Finished scraping {country} - {date}')
 
-
-
-import os
 
 for date in missing_dates_gb:
     run_rpscrape('gb', str(date.date()).replace('-', '/'))

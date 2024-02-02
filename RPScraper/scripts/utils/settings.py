@@ -1,7 +1,7 @@
 import os.path
 import tomli
 
-from src.utils.config import get_attribute
+from utils.config import get_attribute
 PROJECT_DIR = get_attribute('PROJECT_DIR', verbose=False)
 
 

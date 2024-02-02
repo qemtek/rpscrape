@@ -2,7 +2,7 @@ import awswrangler as wr
 import boto3
 
 from utils.s3_tools import list_files, move_file
-from RPScraper.settings import S3_BUCKET
+from settings import S3_BUCKET
 
 session = boto3.session.Session()
 

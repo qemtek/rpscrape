@@ -4,7 +4,7 @@ import datetime as dt
 import subprocess
 import awswrangler as wr
 
-from RPScraper.settings import PROJECT_DIR, boto3_session
+from settings import PROJECT_DIR, boto3_session
 
 
 def run_rpscrape(country, date):

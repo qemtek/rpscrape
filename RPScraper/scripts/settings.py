@@ -1,6 +1,6 @@
 import boto3
 
-from RPScraper.src.utils.config import get_attribute
+from utils.config import get_attribute
 
 PROJECT_DIR = get_attribute('PROJECT_DIR')
 print(f"PROJECT_DIR: {PROJECT_DIR}")

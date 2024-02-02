@@ -1,12 +1,11 @@
 import awswrangler as wr
 import boto3
 import datetime as dt
-import sys
 
 mode = 'overwrite'  #sys.argv[1]
 print(f"Mode (overwrite/append): {mode}")
 
-from RPScraper.settings import S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE, \
+from settings import S3_BUCKET, AWS_GLUE_DB, AWS_GLUE_TABLE, \
     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 session = boto3.session.Session(
