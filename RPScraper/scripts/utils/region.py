@@ -2,7 +2,7 @@ from orjson import loads
 
 
 def get_region(course_id):
-    courses = loads(open('../courses/_courses', 'r').read())
+    courses = loads(open('courses/_courses', 'r').read())
     courses.pop('all')
 
     for region, course in courses.items():
