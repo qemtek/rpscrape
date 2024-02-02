@@ -11,8 +11,8 @@ jobs:
       - run:
           command: |
             # Run scraper
-            pip install --upgrade pip
-            pip install -r requirements.txt 
+            pip install --upgrade pip --user
+            pip install -r requirements.txt --user
             chmod u+x RPScraper/scripts/run_daily_updates.sh 
             ./RPScraper/scripts/run_daily_updates.sh
       - save_cache:
