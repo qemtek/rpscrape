@@ -4,7 +4,6 @@ import os
 from utils.config import get_attribute
 
 PROJECT_DIR =  os.path.dirname(os.path.abspath(__file__))
-print(f"PROJECT_DIR: {PROJECT_DIR}")
 S3_BUCKET = get_attribute('S3_BUCKET')
 
 AWS_GLUE_DB = get_attribute('AWS_GLUE_DB')

@@ -12,7 +12,7 @@ from settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_RPSCRAPE_TABLE_NAM
 from utils.general import clean_data
 
 
-df_all_dir = f'{PROJECT_DIR}/tmp/df_all.csv'
+df_all_dir = f'RPScraper/tmp/df_all.csv'
 
 
 def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
@@ -55,14 +55,14 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
 
 def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
     # Get all files currently in S3
-    folders = os.listdir(f"{PROJECT_DIR}/{folder}/")
+    folders = os.listdir(f"RPScraper/{folder}/")
     folders = [f for f in folders if 'DS_Store' not in f and '.keep' not in f
                and '.ipynb_checkpoints' not in f]
     print(f"Folders found: {folders}")
     first_row = True
     for country in folders:
         print(f"Loading data for country: {country}")
-        files = os.listdir(f"{PROJECT_DIR}/{folder}/{country}/")
+        files = os.listdir(f"RPScraper/{folder}/{country}/")
         files = [f for f in files if 'DS_Store' not in f and '.keep' not in f
                  and '.ipynb_checkpoints' not in f and '.csv' in f]
         print(f"Adding {len(files)} files")
@@ -122,6 +122,6 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 if __name__ == '__main__':
     refresh = str(sys.argv[1])
     refresh = refresh == 'true'
-    df_all_dir = f"{PROJECT_DIR}/tmp/df_all.csv"
+    df_all_dir = f"RPScraper/tmp/df_all.csv"
     print(f"refresh = {refresh}")
     upload_local_files_to_dataset(full_refresh=refresh)
