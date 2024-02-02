@@ -21,7 +21,7 @@ class RandomHeader:
         }
 
     def load_user_agents(self):
-        with open('utils/agents/user-agents.txt') as f:
+        with open('scripts/utils/agents/user-agents.txt') as f:
             for line in f:
                 self.user_agents.append(line.strip())
 
