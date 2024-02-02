@@ -12,4 +12,5 @@ do
   python3 ./rpscrape.py -d "$date" -r "$country" || echo "Completed"
 done
 
+export PYTHONPATH=..
 python upload_data_to_s3.py false
