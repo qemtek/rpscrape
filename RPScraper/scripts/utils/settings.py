@@ -1,8 +1,7 @@
 import os.path
 import tomli
 
-from utils.config import get_attribute
-PROJECT_DIR = get_attribute('PROJECT_DIR', verbose=False)
+PROJECT_DIR = os.environ.get('PROJECT_DIR', '/')
 
 
 class Settings:
