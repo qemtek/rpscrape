@@ -12,7 +12,7 @@ from settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_RPSCRAPE_TABLE_NAM
 from utils.general import clean_data
 
 
-df_all_dir = f'RPScraper/tmp/df_all.csv'
+df_all_dir = f'tmp/df_all.csv'
 
 
 def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
@@ -83,7 +83,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 
     # Upload the dataframe to the /datasets/ directory in S3
     if os.path.exists(df_all_dir):
-        df = pd.read_csv(df_all_dir, error_bad_lines=False, warn_bad_lines=True)
+        df = pd.read_csv(df_all_dir, engine='python')
         print(f"Loaded {len(df)} rows")
         # Do some checks to remove bad rows
         df = df[~df['country'].isna()]
