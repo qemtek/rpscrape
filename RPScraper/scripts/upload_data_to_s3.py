@@ -68,7 +68,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
         print(f"Adding {len(files)} files")
         assert len(files) > 0, 'There are no files to upload'
         # Download / Upload the first file manually with overwrite
-        filename = f"{PROJECT_DIR}/{folder}/{country}/{files[0]}"
+        filename = f"RPScraper/{folder}/{country}/{files[0]}"
         if first_row:
             append_to_pdataset(filename, mode='w', header=True, folder=folder)
             first_row = False
@@ -77,7 +77,7 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
             start = 0
         files = files[start:]
         for file in files:
-            filename = f"{PROJECT_DIR}/{folder}/{country}/{file}"
+            filename = f"RPScraper/{folder}/{country}/{file}"
             print(filename)
             append_to_pdataset(local_path=filename, folder=folder)
 
