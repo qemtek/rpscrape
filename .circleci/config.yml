@@ -11,7 +11,8 @@ jobs:
       - run:
           command: |
             # Run scraper
-            chmod u+x RPScraper/scripts/run_daily_updates.sh
+            pip install -r requirements.txt 
+            chmod u+x RPScraper/scripts/run_daily_updates.sh 
             ./RPScraper/scripts/run_daily_updates.sh
       - save_cache:
           key: py-deps-{{ checksum "requirements.txt" }}
