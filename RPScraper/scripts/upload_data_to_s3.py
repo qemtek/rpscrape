@@ -18,7 +18,7 @@ df_all_dir = f'RPScraper/tmp/df_all.csv'
 def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
     try:
         if folder == 'data/dates':
-            df = pd.read_csv(local_path,  warn_bad_lines=True, error_bad_lines=False, engine='python')
+            df = pd.read_csv(local_path, engine='python')
             cols = df.columns
             for key, value in COL_DTYPES.items():
                 if key in cols:
