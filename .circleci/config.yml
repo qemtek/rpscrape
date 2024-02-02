@@ -11,8 +11,8 @@ jobs:
       - run:
           command: |
             # Run scraper
-            export PROJECT_DIR=. ;
             export PYTHONPATH=RPScraper ;
+            xport PROJECT_DIR=/ ;
             pip install --upgrade pip ; 
             pip install -r requirements.txt ;
             chmod u+x RPScraper/scripts/run_daily_updates.sh ;
