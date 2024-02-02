@@ -1,4 +1,6 @@
 #!/bin/bash
+cd RPScraper || exit
+export PYTHONPATH=.
 date=$(date +%Y/%m/%d -d "yesterday")
 countries=("gb" "ire" "usa" "aus")
 
@@ -10,8 +12,7 @@ echo "${countries[@]}"
 for country in "${countries[@]}"
 do
   echo "Running scraper. Date: $date, Country: $country"
-  python3 RPScrape/scripts/rpscrape.py -d "$date" -r "$country" || echo "Completed"
+  python3 scripts/rpscrape.py -d "$date" -r "$country" || echo "Completed"
 done
 
-export PYTHONPATH=RPScrape
-python RPScrape/upload_data_to_s3.py false
+python scripts/upload_data_to_s3.py false
