@@ -92,7 +92,7 @@ def get_race_urls_date(dates, region):
 
 
 def scrape_races(races, folder_name, file_name, file_extension, code, file_writer):
-    out_dir = f'RPScraper/data/{folder_name}/{code}'
+    out_dir = f'data/{folder_name}/{code}'
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
