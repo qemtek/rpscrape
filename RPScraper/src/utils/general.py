@@ -3,7 +3,7 @@ import pandas as pd
 import awswrangler as wr
 import os
 
-from RPScraper.settings import PROJECT_DIR, S3_BUCKET
+from settings import PROJECT_DIR, S3_BUCKET
 
 
 def convert_off_to_readable_format(x):
