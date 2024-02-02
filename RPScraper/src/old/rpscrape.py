@@ -14,7 +14,7 @@ from utils.argparser import ArgParser
 from utils.completer import Completer
 from utils.header import RandomHeader
 from utils.race import Race, VoidRaceError
-from utils.settings import Settings
+from utils.rpscrape_settings import Settings
 from utils.update import Update
 
 from utils.course import course_name, courses

@@ -1,6 +1,8 @@
 #!/bin/bash
+
 cd RPScraper || exit
 export PYTHONPATH=.
+
 date=$(date +%Y/%m/%d -d "yesterday")
 countries=("gb" "ire" "usa" "aus")
 
