@@ -1,6 +1,4 @@
 #!/bin/bash
-cd RPScraper/scripts || exit
-
 date=$(date +%Y/%m/%d -d "yesterday")
 countries=("gb" "ire" "usa" "aus")
 
