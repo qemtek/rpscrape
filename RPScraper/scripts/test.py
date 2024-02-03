@@ -37,7 +37,7 @@ missing_dates_ire = [d for d in dd if d not in list(df_ire['date'].unique())]
 # missing_dates_aus = [d for d in dd if d not in list(df_aus['date'].unique())]
 
 def run_rpscrape(country, date):
-    subprocess.call(f'python3 ../scripts/rpscrape.py -d {date} -c {country}', shell=True)
+    subprocess.call(f'python3 scripts/rpscrape.py -d {date} -c {country}', shell=True)
     print(f'Finished scraping {country} - {date}')
 
 
