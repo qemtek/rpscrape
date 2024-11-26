@@ -390,7 +390,8 @@ def parse_races(session, race_urls, date):
 
             try:
                 runners[horse_id]['draw'] = int(find(horse, 'span', 'RC-cardPage-runnerNumber-draw', attrib='data-order-draw'))
-            except ValueError:
+            except ValueError as e:
+                print(f"Error getting draw, error: {e}")
                 runners[horse_id]['draw'] = None
 
             runners[horse_id]['headgear'] = find(horse, 'span', 'RC-cardPage-runnerHeadGear')

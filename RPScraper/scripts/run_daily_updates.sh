@@ -4,7 +4,7 @@ cd RPScraper || exit
 export PYTHONPATH=.
 
 date=$(date +%Y/%m/%d -d "yesterday")
-countries=("gb" "ire" "usa" "aus")
+countries=("gb" "ire" "usa" "aus" "fr")
 
 echo "Running rpscrape for date: $date"
 echo "Running rpscrape for countries: "

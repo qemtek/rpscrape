@@ -15,13 +15,13 @@ def run_rpscrape(country, date):
 
 
 date_today = dt.datetime.today().date()
-start_date = date_today - dt.timedelta(days=round(364.25*10))
+start_date = date_today - dt.timedelta(days=round(364.25*15))
 print(f"Start date: {start_date}")
 end_date = date_today - dt.timedelta(days=1)
 print(f"End date: {end_date}")
 
 # Get the countries we want
-countries = ["ire", "gb", "aus", "usa"]
+countries = ["ire", "gb"]  # "aus", "usa", "fr"
 # Find the number of days between the start and end dates
 delta = end_date - start_date
 dates = list()

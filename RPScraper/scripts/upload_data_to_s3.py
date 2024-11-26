@@ -1,5 +1,5 @@
 import sys
-print(f"Arg supplied to upload_data_to_s3.py: {sys.argv[1]}")
+# print(f"Arg supplied to upload_data_to_s3.py: {sys.argv[1]}")
 
 import awswrangler as wr
 import pandas as pd
@@ -120,8 +120,9 @@ def upload_local_files_to_dataset(folder='data/dates', full_refresh=False):
 
 
 if __name__ == '__main__':
-    refresh = str(sys.argv[1])
-    refresh = refresh == 'true'
+    # refresh = str(sys.argv[1])
+    # refresh = refresh == 'true'
     df_all_dir = f"tmp/df_all.csv"
+    refresh=False
     print(f"refresh = {refresh}")
     upload_local_files_to_dataset(full_refresh=refresh)
