@@ -13,6 +13,8 @@ from utils.going import get_surface
 from utils.header import RandomHeader
 from utils.lxml_funcs import find
 from utils.region import get_region
+from utils.stats import Stats
+# from utils.odds import Odds
 
 
 random_header = RandomHeader()
@@ -39,11 +41,29 @@ def distance_to_furlongs(distance):
     return float(dist)
 
 
+def get_accordion(session, url):
+    race_id = url.split('/')[-1]
+    url = f'https://www.racingpost.com/racecards/data/accordion/{race_id}'
+    r = session.get(url, headers=random_header.header())
+    doc = html.fromstring(r.content)
+
+    return doc
+
+
+def get_odds(session, url):
+    r = session.get(url + '/odds-comparison', headers=random_header.header())
+    doc = html.fromstring(r.content.decode('utf-8'))
+
+    return doc
+
+
 def get_going_info(session, date):
     r = session.get(f'https://www.racingpost.com/non-runners/{date}', headers=random_header.header())
     doc = html.fromstring(r.content.decode())
 
-    json_str = doc.xpath('//body/script')[0].text.replace('var __PRELOADED_STATE__ = ', '').strip().strip(';')
+    json_str = (
+        doc.xpath('//body/script')[0].text.replace('var __PRELOADED_STATE__ = ', '').strip().strip(';')
+    )
 
     going_info = defaultdict(dict)
 
@@ -84,28 +104,40 @@ def get_pattern(race_name):
 
 
 def get_race_type(doc, race, distance):
-        race_type = ''
-        fences = find(doc, 'div', 'RC-headerBox__stalls')
+    race_type = ''
+    fences = find(doc, 'div', 'RC-headerBox__stalls')
 
-        if 'hurdle' in fences.lower():
-            race_type = 'Hurdle'
-        elif 'fence' in fences.lower():
-            race_type = 'Chase'
-        else:
-            if distance >= 12:
-                if any(x in race for x in {'national hunt flat', 'nh flat race', 'mares flat race'}):
-                    race_type = 'NH Flat'
-                if any(x in race for x in {'inh bumper', ' sales bumper', 'kepak flat race', 'i.n.h. flat race'}):
-                    race_type = 'NH Flat'
-                if any(x in race for x in {' hurdle', '(hurdle)'}):
-                    race_type = 'Hurdle'
-                if any(x in race for x in {' chase', '(chase)', 'steeplechase', 'steeple-chase', 'steeplchase', 'steepl-chase'}):
-                    race_type = 'Chase'
+    if 'hurdle' in fences.lower():
+        race_type = 'Hurdle'
+    elif 'fence' in fences.lower():
+        race_type = 'Chase'
+    else:
+        if distance >= 12:
+            if any(x in race for x in {'national hunt flat', 'nh flat race', 'mares flat race'}):
+                race_type = 'NH Flat'
+            if any(
+                x in race for x in {'inh bumper', ' sales bumper', 'kepak flat race', 'i.n.h. flat race'}
+            ):
+                race_type = 'NH Flat'
+            if any(x in race for x in {' hurdle', '(hurdle)'}):
+                race_type = 'Hurdle'
+            if any(
+                x in race
+                for x in {
+                    ' chase',
+                    '(chase)',
+                    'steeplechase',
+                    'steeple-chase',
+                    'steeplchase',
+                    'steepl-chase',
+                }
+            ):
+                race_type = 'Chase'
 
-        if race_type == '':
-            race_type = 'Flat'
+    if race_type == '':
+        race_type = 'Flat'
 
-        return race_type
+    return race_type
 
 
 def get_race_urls(session, racecard_url):
@@ -114,7 +146,7 @@ def get_race_urls(session, racecard_url):
 
     race_urls = []
 
-    for meeting in doc.xpath("//section[@data-accordion-row]"):
+    for meeting in doc.xpath('//section[@data-accordion-row]'):
         course = meeting.xpath(".//span[contains(@class, 'RC-accordion__courseName')]")[0]
         if valid_course(course.text_content().strip().lower()):
             for race in meeting.xpath(".//a[@class='RC-meetingItem__link js-navigate-url']"):
@@ -133,7 +165,13 @@ def get_runners(session, profile_urls):
         runner = {}
 
         try:
-            json_str = doc.xpath('//body/script')[0].text.split('window.PRELOADED_STATE =')[1].split('\n')[0].strip().strip(';')
+            json_str = (
+                doc.xpath('//body/script')[0]
+                .text.split('window.PRELOADED_STATE =')[1]
+                .split('\n')[0]
+                .strip()
+                .strip(';')
+            )
             js = loads(json_str)
         except IndexError:
             split = url.split('/')
@@ -265,7 +303,9 @@ def parse_going(going_info):
 
     if 'Rail movements' in going_info:
         going_info = going_info.replace('movements:', 'movements')
-        rail_movements = [x.strip() for x in going_info.split('Rail movements')[1].strip().strip(')').split(',')]
+        rail_movements = [
+            x.strip() for x in going_info.split('Rail movements')[1].strip().strip(')').split(',')
+        ]
         going = going_info.split('(Rail movements')[0].strip()
 
     return going, rail_movements
@@ -278,6 +318,8 @@ def parse_races(session, race_urls, date):
 
     for url in race_urls:
         r = session.get(url, headers=random_header.header(), allow_redirects=False)
+        accordion = get_accordion(session, url)
+        stats = Stats(accordion)
 
         if r.status_code != 200:
             print('Failed to get racecard.')
@@ -308,7 +350,9 @@ def parse_races(session, race_urls, date):
         race['race_name'] = find(doc, 'span', 'RC-header__raceInstanceTitle')
         race['distance_round'] = find(doc, 'strong', 'RC-header__raceDistanceRound')
         race['distance'] = find(doc, 'span', 'RC-header__raceDistance')
-        race['distance'] = race['distance_round'] if not race['distance'] else race['distance'].strip('()')
+        race['distance'] = (
+            race['distance_round'] if not race['distance'] else race['distance'].strip('()')
+        )
         race['distance_f'] = distance_to_furlongs(race['distance_round'])
         race['region'] = get_region(str(race['course_id']))
         race['pattern'] = get_pattern(race['race_name'].lower())
@@ -377,43 +421,58 @@ def parse_races(session, race_urls, date):
                 runners[horse_id]['dam_region'] = dam[1].replace(')', '').strip()
                 runners[horse_id]['damsire_region'] = damsire[1].replace(')', '').strip()
 
-                runners[horse_id]['age'] = find(horse, 'span', 'RC-cardPage-runnerAge', attrib='data-order-age')
+                runners[horse_id]['age'] = find(
+                    horse, 'span', 'RC-cardPage-runnerAge', attrib='data-order-age'
+                )
 
                 sex = find(horse, 'span', 'RC-pedigree__color-sex').split()
 
                 runners[horse_id]['colour'] = sex[0]
                 runners[horse_id]['sex_code'] = sex[1].capitalize()
 
-                runners[horse_id]['trainer'] = find(horse, 'a', 'RC-cardPage-runnerTrainer-name', attrib='data-order-trainer')
+                runners[horse_id]['trainer'] = clean_name(
+                    find(horse, 'a', 'RC-cardPage-runnerTrainer-name', attrib='data-order-trainer')
+                )
 
-            runners[horse_id]['number'] = int(find(horse, 'span', 'RC-cardPage-runnerNumber-no', attrib='data-order-no'))
+            runners[horse_id]['number'] = int(
+                find(horse, 'span', 'RC-cardPage-runnerNumber-no', attrib='data-order-no')
+            )
 
             try:
-                runners[horse_id]['draw'] = int(find(horse, 'span', 'RC-cardPage-runnerNumber-draw', attrib='data-order-draw'))
-            except ValueError as e:
-                print(f"Error getting draw, error: {e}")
+                runners[horse_id]['draw'] = int(
+                    find(horse, 'span', 'RC-cardPage-runnerNumber-draw', attrib='data-order-draw')
+                )
+            except ValueError:
                 runners[horse_id]['draw'] = None
 
             runners[horse_id]['headgear'] = find(horse, 'span', 'RC-cardPage-runnerHeadGear')
             runners[horse_id]['headgear_first'] = find(horse, 'span', 'RC-cardPage-runnerHeadGear-first')
 
             try:
-                runners[horse_id]['lbs'] = int(find(horse, 'span', 'RC-cardPage-runnerWgt-carried', attrib='data-order-wgt'))
+                runners[horse_id]['lbs'] = int(
+                    find(horse, 'span', 'RC-cardPage-runnerWgt-carried', attrib='data-order-wgt')
+                )
             except ValueError:
                 runners[horse_id]['lbs'] = None
 
             try:
-                runners[horse_id]['ofr'] = int(find(horse, 'span', 'RC-cardPage-runnerOr', attrib='data-order-or'))
+                runners[horse_id]['ofr'] = int(
+                    find(horse, 'span', 'RC-cardPage-runnerOr', attrib='data-order-or')
+                )
             except ValueError:
                 runners[horse_id]['ofr'] = None
 
             try:
-                runners[horse_id]['rpr'] = int(find(horse, 'span', 'RC-cardPage-runnerRpr', attrib='data-order-rpr'))
+                runners[horse_id]['rpr'] = int(
+                    find(horse, 'span', 'RC-cardPage-runnerRpr', attrib='data-order-rpr')
+                )
             except ValueError:
                 runners[horse_id]['rpr'] = None
 
             try:
-                runners[horse_id]['ts'] = int(find(horse, 'span', 'RC-cardPage-runnerTs', attrib='data-order-ts'))
+                runners[horse_id]['ts'] = int(
+                    find(horse, 'span', 'RC-cardPage-runnerTs', attrib='data-order-ts')
+                )
             except ValueError:
                 runners[horse_id]['ts'] = None
 
@@ -421,7 +480,7 @@ def parse_races(session, race_urls, date):
             jockey = horse.find('.//a[@data-test-selector="RC-cardPage-runnerJockey-name"]')
 
             if jockey is not None:
-                jock = jockey.attrib['data-order-jockey']
+                jock = clean_name(jockey.attrib['data-order-jockey'])
                 runners[horse_id]['jockey'] = jock if not claim else jock + f'({claim})'
                 runners[horse_id]['jockey_id'] = int(jockey.attrib['href'].split('/')[3])
             else:
@@ -439,6 +498,31 @@ def parse_races(session, race_urls, date):
                 runners[horse_id]['trainer_rtf'] = find(horse, 'span', 'RC-cardPage-runnerTrainer-rtf')
             except TypeError:
                 runners[horse_id]['trainer_rtf'] = None
+
+            if runners[horse_id]['jockey'] is None:
+                runners[horse_id]['stats'] = {}
+                continue
+
+            jockey_name = runners[horse_id]['jockey'].split('(')[0].strip()
+
+            if jockey_name.lower() == 'non-runner':
+                runners[horse_id]['stats'] = {}
+                continue
+
+            try:
+                runner_stats = stats.horses[runners[horse_id]['name']]
+                jockey_stats = stats.jockeys[jockey_name]
+                trainer_stats = stats.trainers[runners[horse_id]['trainer']]
+
+                runners[horse_id]['stats'] = {
+                    'course': runner_stats['course'],
+                    'distance': runner_stats['distance'],
+                    'going': runner_stats['going'],
+                    'jockey': jockey_stats,
+                    'trainer': trainer_stats,
+                }
+            except KeyError:
+                runners[horse_id]['stats'] = {}
 
         race['runners'] = [runner for runner in runners.values()]
         races[race['region']][race['course']][race['off_time']] = race
@@ -468,8 +552,8 @@ def main():
     race_urls = get_race_urls(session, racecard_url)
     races = parse_races(session, race_urls, date)
 
-    if not os.path.exists('racecards'):
-        os.makedirs(f'racecards')
+    if not os.path.exists('../racecards'):
+        os.makedirs('../racecards')
 
     with open(f'racecards/{date}.json', 'w', encoding='utf-8') as f:
         f.write(dumps(races).decode('utf-8'))
