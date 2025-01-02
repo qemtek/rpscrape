@@ -1,26 +1,31 @@
-FROM python:3.8-slim-buster
+FROM python:3.10-slim-buster
 
-RUN apt-get update
-RUN apt-get update && apt-get -y install gcc
-RUN apt-get install --reinstall build-essential -y
-RUN pip install --upgrade pip
+# Set working directory
+WORKDIR /app
 
-ADD requirements.txt /
-ADD requirements.in /
+# Install system dependencies in a single layer to reduce image size
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /RPScraper
-COPY RPScraper /RPScraper
-RUN mkdir -p /tests
-COPY tests /tests
+# Upgrade pip and install Python dependencies
+COPY requirements.txt requirements.in ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-ENV PROJECTSPATH /RPScraper
+# Copy application code
+COPY RPScraper/ /app/RPScraper/
+COPY tests/ /app/tests/
 
-RUN pip3 install -r requirements.txt
-RUN chmod +x RPScraper/scripts/full_refresh.sh
-RUN chmod +x RPScraper/scripts/run_daily_updates.sh
+# Set environment variables
+ENV PROJECTSPATH=/app/RPScraper
+ENV PYTHONPATH=/app
 
-ENV PROJECTSPATH /RPScraper
-ENV PYTHONPATH /
+# Set execute permissions for scripts
+RUN chmod +x RPScraper/scripts/full_refresh.sh \
+    RPScraper/scripts/run_daily_updates.sh
 
-
-# ENTRYPOINT /RPScraper/scripts/full_refresh.sh
+# Default command to run daily updates
+CMD ["/app/RPScraper/scripts/run_daily_updates.sh"]
