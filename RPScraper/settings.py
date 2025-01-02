@@ -4,10 +4,10 @@ import os
 from utils.config import get_attribute
 
 PROJECT_DIR =  os.path.dirname(os.path.abspath(__file__))
-S3_BUCKET = get_attribute('S3_BUCKET')
+S3_BUCKET = 'rpscrape'
 
-AWS_GLUE_DB = get_attribute('AWS_GLUE_DB')
-AWS_RPSCRAPE_TABLE_NAME = get_attribute('AWS_RPSCRAPE_TABLE_NAME')
+AWS_GLUE_DB = 'finish-time-predict'
+AWS_RPSCRAPE_TABLE_NAME = 'rpscrape'
 
 AWS_ACCESS_KEY_ID = get_attribute('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = get_attribute('AWS_SECRET_ACCESS_KEY')
