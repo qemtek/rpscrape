@@ -29,3 +29,4 @@ RUN chmod +x RPScraper/scripts/full_refresh.sh \
 
 # Default command to run daily updates
 CMD ["/app/RPScraper/scripts/run_daily_updates.sh"]
+
