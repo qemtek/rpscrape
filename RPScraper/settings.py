@@ -1,22 +1,17 @@
 import boto3
 import os
 
-from utils.config import get_attribute
-
 PROJECT_DIR =  os.path.dirname(os.path.abspath(__file__))
 S3_BUCKET = 'rpscrape'
 
 AWS_GLUE_DB = 'finish-time-predict'
 AWS_RPSCRAPE_TABLE_NAME = 'rpscrape'
 
-AWS_ACCESS_KEY_ID = get_attribute('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = get_attribute('AWS_SECRET_ACCESS_KEY')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
-boto3_session = boto3.session.Session(
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name='eu-west-1'
-)
+# When running in AWS, boto3 will automatically use the task role credentials
+boto3_session = boto3.session.Session(region_name='eu-west-1')
 
 SCHEMA_COLUMNS = {
     'id': 'int',
