@@ -5,22 +5,12 @@
     "cpu": "256",
     "memory": "512",
     "executionRoleArn": "arn:aws:iam::249959970268:role/ecsTaskExecutionRole",
-    "taskRoleArn": "arn:aws:iam::249959970268:role/ecsTaskRole",
+    "taskRoleArn": "arn:aws:iam::249959970268:role/ecs-service-role",
     "containerDefinitions": [
         {
             "name": "rpscrape",
             "image": "249959970268.dkr.ecr.eu-west-1.amazonaws.com/rpscrape:latest",
             "essential": true,
-            "environment": [
-                {
-                    "name": "AWS_ACCESS_KEY_ID",
-                    "value": "#{AWS_ACCESS_KEY_ID}"
-                },
-                {
-                    "name": "AWS_SECRET_ACCESS_KEY",
-                    "value": "#{AWS_SECRET_ACCESS_KEY}"
-                }
-            ],
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
