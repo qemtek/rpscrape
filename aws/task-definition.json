@@ -1,5 +1,5 @@
 {
-    "family": "rpscrape-task",
+    "family": "rpscrape",
     "networkMode": "awsvpc",
     "requiresCompatibilities": ["FARGATE"],
     "cpu": "256",
