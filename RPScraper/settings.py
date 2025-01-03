@@ -11,7 +11,11 @@ AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
 # When running in AWS, boto3 will automatically use the task role credentials
-boto3_session = boto3.session.Session(region_name='eu-west-1')
+boto3_session = boto3.Session(
+    region_name='eu-west-1',
+    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+)
 
 SCHEMA_COLUMNS = {
     'id': 'int',
