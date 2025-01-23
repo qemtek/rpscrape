@@ -3,25 +3,26 @@
 import datetime as dt
 import subprocess
 import awswrangler as wr
+import pandas as pd
 
 from settings import PROJECT_DIR, boto3_session
 
 
 def run_rpscrape(country, date):
     try:
-        subprocess.call(f'python ../scripts/rpscrape.py -d {date} -r {country}', shell=True)
+        subprocess.call(f'python scripts/rpscrape.py -d {date} -r {country}', shell=True)
     except EOFError:
         pass
 
 
 date_today = dt.datetime.today().date()
-start_date = date_today - dt.timedelta(days=round(364.25*15))
+start_date = pd.to_datetime('2020-11-23').date()  #date_today - dt.timedelta(days=round(364.25*15))
 print(f"Start date: {start_date}")
 end_date = date_today - dt.timedelta(days=1)
 print(f"End date: {end_date}")
 
 # Get the countries we want
-countries = ["ire", "gb"]  # "aus", "usa", "fr"
+countries = ["gb"]  # "aus", "usa", "fr" "ire"
 # Find the number of days between the start and end dates
 delta = end_date - start_date
 dates = list()

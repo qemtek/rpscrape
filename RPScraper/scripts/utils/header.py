@@ -1,5 +1,6 @@
 from random import choice, sample
-
+import os
+from pathlib import Path
 
 class RandomHeader:
 
@@ -21,7 +22,8 @@ class RandomHeader:
         }
 
     def load_user_agents(self):
-        with open('scripts/utils/agents/user-agents.txt') as f:
+        agents_file = Path(__file__).parent / 'agents' / 'user-agents.txt'
+        with open(agents_file) as f:
             for line in f:
                 self.user_agents.append(line.strip())
 

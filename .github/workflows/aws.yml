@@ -3,7 +3,6 @@ name: Deploy to Amazon ECS
 on:
   push:
     branches:
-      - main
       - master
 
 env:
@@ -12,10 +11,6 @@ env:
   ECS_CLUSTER: horse-racing-trader
   ECS_TASK_DEFINITION: aws/task-definition.json
   CONTAINER_NAME: rpscrape
-
-permissions:
-  contents: read
-  id-token: write
 
 jobs:
   deploy:
@@ -44,7 +39,7 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build --platform linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
@@ -57,7 +52,7 @@ jobs:
         image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition (ECS_TASK_DEFINITION)
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v4
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         cluster: ${{ env.ECS_CLUSTER }}
