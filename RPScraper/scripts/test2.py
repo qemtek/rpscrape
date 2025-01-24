@@ -3,6 +3,8 @@ import boto3
 import datetime as dt
 import pandas as pd
 import subprocess
+import os
+import glob
 from pathlib import Path
 
 from settings import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
@@ -15,9 +17,53 @@ boto3_session = boto3.session.Session(
     region_name='eu-west-1'
 )
 
+def delete_local_data_in_range(start_date, end_date, countries=None):
+    """
+    Delete local CSV files within a specified date range for given countries
+    """
+    if countries is None:
+        countries = ['gb', 'ire']
+    
+    # Convert dates to datetime for comparison
+    start_dt = pd.to_datetime(start_date)
+    end_dt = pd.to_datetime(end_date)
+    
+    # Get the data directory
+    data_dir = Path(__file__).parent.parent / 'data'
+    
+    for country in countries:
+        # Find all CSV files for this country
+        csv_files = glob.glob(str(data_dir / f"{country}*.csv"))
+        for csv_file in csv_files:
+            try:
+                # Read the file
+                df = pd.read_csv(csv_file)
+                if 'date' not in df.columns:
+                    print(f"Warning: No date column in {csv_file}")
+                    continue
+                
+                # Convert date column to datetime
+                df['date'] = pd.to_datetime(df['date'])
+                
+                # Filter out rows in the specified date range
+                df = df[~((df['date'] >= start_dt) & (df['date'] <= end_dt))]
+                
+                if len(df) > 0:
+                    # Save the filtered data back to the file
+                    df.to_csv(csv_file, index=False)
+                else:
+                    # If no data left, delete the file
+                    os.remove(csv_file)
+                    print(f"Deleted empty file: {csv_file}")
+                
+            except Exception as e:
+                print(f"Error processing {csv_file}: {str(e)}")
+    
+    print(f"Deleted local data between {start_date} and {end_date} for countries: {countries}")
+
 def delete_data_in_range(start_date, end_date, countries=None):
     """
-    Delete data within a specified date range for given countries
+    Delete data within a specified date range for given countries from Athena
     """
     if countries is None:
         countries = ['gb', 'ire']
@@ -70,7 +116,8 @@ def refresh_data_for_range(start_date, end_date, countries=None):
     """
     Main function to delete and repopulate data for a date range
     """
-    # Delete existing data
+    # Delete existing data locally and in Athena
+    delete_local_data_in_range(start_date, end_date, countries)
     delete_data_in_range(start_date, end_date, countries)
     
     # Repopulate data

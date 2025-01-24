@@ -13,18 +13,28 @@ def analyze_rpr_in_files():
     # Process GB files
     gb_files = glob.glob(str(data_dir / 'gb' / '*.csv'))
     for file in gb_files:
-        df = pd.read_csv(file)
-        df['date'] = os.path.basename(file).replace('.csv', '').replace('_', '-')
-        df['country'] = 'gb'
-        all_dfs.append(df)
+        try:
+            df = pd.read_csv(file)
+            if not df.empty:  # Only process non-empty dataframes
+                df['date'] = os.path.basename(file).replace('.csv', '').replace('_', '-')
+                df['country'] = 'gb'
+                all_dfs.append(df)
+        except pd.errors.EmptyDataError:
+            print(f"Skipping empty file: {file}")
+            continue
     
     # Process IRE files
     ire_files = glob.glob(str(data_dir / 'ire' / '*.csv'))
     for file in ire_files:
-        df = pd.read_csv(file)
-        df['date'] = os.path.basename(file).replace('.csv', '').replace('_', '-')
-        df['country'] = 'ire'
-        all_dfs.append(df)
+        try:
+            df = pd.read_csv(file)
+            if not df.empty:  # Only process non-empty dataframes
+                df['date'] = os.path.basename(file).replace('.csv', '').replace('_', '-')
+                df['country'] = 'ire'
+                all_dfs.append(df)
+        except pd.errors.EmptyDataError:
+            print(f"Skipping empty file: {file}")
+            continue
     
     if not all_dfs:
         print("No data files found!")
@@ -34,7 +44,7 @@ def analyze_rpr_in_files():
     combined_df = pd.concat(all_dfs, ignore_index=True)
     
     # Print columns for debugging
-    print("Available columns:", combined_df.columns.tolist())
+    print("\nAvailable columns:", combined_df.columns.tolist())
     
     # Check if required columns exist
     required_columns = ['date', 'rpr', 'num']
