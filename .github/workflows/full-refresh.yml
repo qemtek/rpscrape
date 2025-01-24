@@ -1,9 +1,9 @@
 name: Full Refresh
 
 on:
-  workflow_dispatch:  # Allow manual triggering
-  schedule:
-    - cron: '0 0 1 * *'  # Run at midnight on the first day of each month
+  push:
+    branches:
+      - master
 
 env:
   AWS_REGION: eu-west-1
