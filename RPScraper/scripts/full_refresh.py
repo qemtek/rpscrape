@@ -16,7 +16,7 @@ def run_rpscrape(country, date):
 
 
 date_today = dt.datetime.today().date()
-start_date = pd.to_datetime('2020-11-23').date()  #date_today - dt.timedelta(days=round(364.25*15))
+start_date = pd.to_datetime('2008-05-28').date()
 print(f"Start date: {start_date}")
 end_date = date_today - dt.timedelta(days=1)
 print(f"End date: {end_date}")
