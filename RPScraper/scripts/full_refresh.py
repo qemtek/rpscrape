@@ -35,8 +35,5 @@ for country in countries:
             print(local_file_path)
         try:
             run_rpscrape(country, day)
-            file_name = local_file_path.split('/')[-1]
-            wr.s3.upload(local_file=local_file_path, boto3_session=boto3_session,
-                         path=f"s3://rpscrape/data/{country}/{file_name}")
         except Exception as e:
             print(f"Couldnt get data for {country} on {day}")
