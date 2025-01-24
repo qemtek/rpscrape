@@ -8,8 +8,7 @@ on:
 env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: rpscrape_full_refresh
-  ECS_CLUSTER: rpscrape
-  ECS_SERVICE: full-refresh
+  ECS_CLUSTER: horse-racing-trader
   ECS_TASK_DEFINITION: .aws/full-refresh-task-definition.json
 
 jobs:
@@ -55,6 +54,5 @@ jobs:
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
