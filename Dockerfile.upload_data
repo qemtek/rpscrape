@@ -26,10 +26,11 @@ COPY RPScraper/src /app/RPScraper/src/
 COPY RPScraper/courses /app/RPScraper/courses/
 COPY RPScraper/__init__.py /app/RPScraper/
 COPY RPScraper/settings.py /app/RPScraper/
+RUN mkdir -p /app/RPScraper/tmp
 
 # Set environment variables
 ENV PROJECTSPATH=/app/RPScraper
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/RPScraper
 
 # Run the script
 CMD ["python", "/app/RPScraper/scripts/process_s3_to_glue.py"]

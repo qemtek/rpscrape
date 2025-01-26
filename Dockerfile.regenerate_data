@@ -32,7 +32,7 @@ COPY tests/ /app/tests/
 
 # Set environment variables
 ENV PROJECTSPATH=/app/RPScraper
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/RPScraper
 ENV START_DATE=2008-05-28
 ENV END_DATE=
 ENV COUNTRIES=gb,ire
