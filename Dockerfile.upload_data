@@ -4,16 +4,33 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Copy only the necessary files
-COPY RPScraper/settings.py ./RPScraper/
-COPY RPScraper/scripts/process_s3_to_glue.py ./RPScraper/scripts/
-COPY requirements.txt .
+# Install system dependencies in a single layer to reduce image size
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Create necessary directories
+RUN mkdir -p /app/RPScraper/raw_data
 
-# Set Python path to include RPScraper directory
+# Upgrade pip and install Python dependencies
+COPY requirements.txt requirements.in ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# First, copy only the necessary RPScraper files (excluding data directories)
+COPY RPScraper/scripts /app/RPScraper/scripts/
+COPY RPScraper/settings /app/RPScraper/settings/
+COPY RPScraper/src /app/RPScraper/src/
+COPY RPScraper/courses /app/RPScraper/courses/
+COPY RPScraper/__init__.py /app/RPScraper/
+COPY RPScraper/settings.py /app/RPScraper/
+COPY RPScraper/configuration.py /app/RPScraper/
+
+# Set environment variables
+ENV PROJECTSPATH=/app/RPScraper
 ENV PYTHONPATH=/app
 
 # Run the script
-CMD ["python", "RPScraper/scripts/process_s3_to_glue.py"]
+CMD ["python", "/app/RPScraper/scripts/process_s3_to_glue.py"]
