@@ -24,8 +24,7 @@ ENV PROJECTSPATH=/app/RPScraper
 ENV PYTHONPATH=/app
 
 # Set execute permissions for scripts
-RUN chmod +x RPScraper/scripts/full_refresh.sh \
-    RPScraper/scripts/run_daily_updates.sh
+RUN chmod +x RPScraper/scripts/run_daily_updates.sh
 
 # Default command to run daily updates
 CMD ["/app/RPScraper/scripts/run_daily_updates.sh"]
