@@ -52,7 +52,7 @@ def launch_fargate_task(ecs_client: Any, cluster: str, task_definition: str,
                 {'name': 'START_DATE', 'value': start_date},
                 {'name': 'END_DATE', 'value': end_date},
                 {'name': 'COUNTRIES', 'value': country},
-                {'name': 'FORCE', 'value': 'false'}
+                {'name': 'FORCE', 'value': 'true'}
             ]
         }]
     }
