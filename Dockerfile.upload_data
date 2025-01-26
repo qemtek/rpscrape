@@ -26,7 +26,6 @@ COPY RPScraper/src /app/RPScraper/src/
 COPY RPScraper/courses /app/RPScraper/courses/
 COPY RPScraper/__init__.py /app/RPScraper/
 COPY RPScraper/settings.py /app/RPScraper/
-COPY RPScraper/configuration.py /app/RPScraper/
 
 # Set environment variables
 ENV PROJECTSPATH=/app/RPScraper

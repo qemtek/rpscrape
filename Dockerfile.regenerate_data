@@ -28,7 +28,6 @@ COPY RPScraper/__init__.py /app/RPScraper/
 COPY RPScraper/settings.py /app/RPScraper/
 COPY RPScraper/scripts/utils/rpscrape_settings.py /app/RPScraper/scripts/utils/
 COPY RPScraper/scripts/utils/config.py /app/RPScraper/scripts/utils/
-COPY RPScraper/configuration.py /app/RPScraper/
 
 # Copy application code
 COPY tests/ /app/tests/
