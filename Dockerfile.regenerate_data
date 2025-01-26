@@ -22,6 +22,10 @@ COPY tests/ /app/tests/
 # Set environment variables
 ENV PROJECTSPATH=/app/RPScraper
 ENV PYTHONPATH=/app
+ENV START_DATE=2008-05-28
+ENV END_DATE=
+ENV COUNTRIES=gb,ire
+ENV FORCE=false
 
 # Run the script
 CMD ["poetry", "run", "python", "/app/RPScraper/scripts/full_refresh.py"]
