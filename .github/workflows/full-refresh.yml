@@ -9,7 +9,7 @@ env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: rpscrape_full_refresh
   ECS_CLUSTER: horse-racing-trader
-  ECS_TASK_DEFINITION: .aws/full-refresh-task-definition.json
+  ECS_TASK_DEFINITION: .aws/full-refresh.json
 
 jobs:
   deploy:

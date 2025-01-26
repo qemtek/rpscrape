@@ -9,7 +9,7 @@ env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: rpscrape
   ECS_CLUSTER: horse-racing-trader
-  ECS_TASK_DEFINITION: aws/task-definition.json
+  ECS_TASK_DEFINITION: .aws/run-rpscrape.json
   CONTAINER_NAME: rpscrape
 
 jobs:

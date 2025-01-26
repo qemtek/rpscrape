@@ -9,7 +9,7 @@ env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: rpscrape_upload_data
   ECS_CLUSTER: horse-racing-trader
-  ECS_TASK_DEFINITION: .aws/upload-data-task-definition.json
+  ECS_TASK_DEFINITION: .aws/upload-data.json
   LOG_GROUP_NAME: /ecs/rpscrape-upload-data
 
 jobs:
