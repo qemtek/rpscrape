@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.10-slim-buster
+FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
@@ -23,8 +23,5 @@ COPY tests/ /app/tests/
 ENV PROJECTSPATH=/app/RPScraper
 ENV PYTHONPATH=/app
 
-# Set execute permissions for scripts
-RUN chmod +x RPScraper/scripts/full_refresh.sh
-
-# Default command to run full refresh
-CMD ["/app/RPScraper/scripts/full_refresh.sh"]
+# Run the script
+CMD ["poetry", "run", "python", "/app/RPScraper/scripts/full_refresh.py"]

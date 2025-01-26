@@ -7,9 +7,10 @@ on:
 
 env:
   AWS_REGION: eu-west-1
-  ECR_REPOSITORY: rpscrape_full_refresh
+  ECR_REPOSITORY: rpscrape/regenerate_data
   ECS_CLUSTER: horse-racing-trader
-  ECS_TASK_DEFINITION: .aws/full-refresh.json
+  ECS_TASK_DEFINITION: .aws/regenerate-data.json
+  LOG_GROUP_NAME: /ecs/rpscrape-regenerate-data
 
 jobs:
   deploy:
@@ -26,6 +27,18 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
+
+    - name: Create CloudWatch Log Group
+      run: |
+        # Check if log group exists
+        if ! aws logs describe-log-groups --log-group-name-prefix ${{ env.LOG_GROUP_NAME }} | grep -q ${{ env.LOG_GROUP_NAME }}; then
+          echo "Creating log group ${{ env.LOG_GROUP_NAME }}"
+          aws logs create-log-group --log-group-name ${{ env.LOG_GROUP_NAME }}
+          # Set retention policy to 30 days to manage costs
+          aws logs put-retention-policy --log-group-name ${{ env.LOG_GROUP_NAME }} --retention-in-days 30
+        else
+          echo "Log group ${{ env.LOG_GROUP_NAME }} already exists"
+        fi
 
     - name: Login to Amazon ECR
       id: login-ecr
