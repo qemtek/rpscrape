@@ -22,16 +22,16 @@ def get_existing_s3_files():
     """Get all existing files in S3 bucket organized by country"""
     existing_files = defaultdict(set)
     try:
-        # List all objects in the rpscrape/data/dates prefix
-        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/rpscrape/data/dates/", boto3_session=boto3_session)
+        # List all objects in the data/dates prefix
+        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/data/dates/", boto3_session=boto3_session)
         
         # Organize files by country
         for s3_key in all_files:
-            if s3_key.startswith('rpscrape/data/dates/'):
+            if s3_key.startswith('data/dates/'):
                 parts = s3_key.split('/')
-                if len(parts) == 5:  # rpscrape/data/dates/country/filename
-                    country = parts[3]
-                    filename = parts[4]
+                if len(parts) == 4:  # data/dates/country/filename
+                    country = parts[2]
+                    filename = parts[3]
                     existing_files[country].add(filename)
                     
         print(f"Found existing files in S3 for countries: {list(existing_files.keys())}")
@@ -49,7 +49,7 @@ def upload_to_s3(local_path, country):
     if not os.path.exists(local_path):
         return
         
-    s3_key = f"rpscrape/data/dates/{country}/{os.path.basename(local_path)}"
+    s3_key = f"data/dates/{country}/{os.path.basename(local_path)}"
     s3_path = f"s3://{S3_BUCKET}/{s3_key}"
     
     try:
