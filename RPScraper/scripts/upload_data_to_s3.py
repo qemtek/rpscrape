@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import pyarrow
 import numpy as np
+from datetime import datetime
 
 from settings import PROJECT_DIR, S3_BUCKET, AWS_GLUE_DB, AWS_RPSCRAPE_TABLE_NAME,\
     SCHEMA_COLUMNS, boto3_session, COL_DTYPES, OUTPUT_COLS
@@ -35,6 +36,8 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
             df['prize'] = df['prize'].astype(str)
             df['date'] = pd.to_datetime(df['date'])
             df['year'] = df['date'].apply(lambda x: x.year)
+            # Add created_at timestamp
+            df['created_at'] = datetime.now().isoformat()
             df = df[list(SCHEMA_COLUMNS.keys())]
             mode = 'a' if os.path.exists(df_all_dir) else 'w'
             header = False if os.path.exists(df_all_dir) else True

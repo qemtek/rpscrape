@@ -59,52 +59,53 @@ def upload_to_s3(local_path, country):
         print(f"Error uploading {local_path} to S3: {str(e)}")
 
 
-# Get configuration from environment variables
-date_today = dt.datetime.today().date()
-start_date = pd.to_datetime(os.getenv('START_DATE', '2008-05-28')).date()
-end_date = pd.to_datetime(os.getenv('END_DATE', (date_today - dt.timedelta(days=1)).strftime('%Y-%m-%d'))).date()
-countries = os.getenv('COUNTRIES', 'gb,ire').lower().split(',')
-force = os.getenv('FORCE', '').lower() in ('true', '1', 'yes')  # Default to False
+if __name__ == "__main__":
+    # Get configuration from environment variables
+    date_today = dt.datetime.today().date()
+    start_date = pd.to_datetime(os.getenv('START_DATE', '2008-05-28')).date()
+    end_date = pd.to_datetime(os.getenv('END_DATE', (date_today - dt.timedelta(days=1)).strftime('%Y-%m-%d'))).date()
+    countries = os.getenv('COUNTRIES', 'gb,ire').lower().split(',')
+    force = os.getenv('FORCE', '').lower() in ('true', '1', 'yes')  # Default to False
 
-print(f"Start date: {start_date}")
-print(f"End date: {end_date}")
-print(f"Countries: {countries}")
-print(f"Force mode: {'enabled' if force else 'disabled'}")
+    print(f"Start date: {start_date}")
+    print(f"End date: {end_date}")
+    print(f"Countries: {countries}")
+    print(f"Force mode: {'enabled' if force else 'disabled'}")
 
-# Get existing files from S3 at startup
-existing_s3_files = get_existing_s3_files() if not force else defaultdict(set)
+    # Get existing files from S3 at startup
+    existing_s3_files = get_existing_s3_files() if not force else defaultdict(set)
 
-# Find the number of days between the start and end dates
-delta = end_date - start_date
+    # Find the number of days between the start and end dates
+    delta = end_date - start_date
 
-for country in countries:
-    country = country.strip()  # Remove any whitespace
-    country_files = existing_s3_files.get(country, set())
-    print(f"\nProcessing {country} - {len(country_files)} existing files found")
-    
-    for i in range(delta.days + 1):
-        day = (start_date + dt.timedelta(days=i)).strftime(format='%Y/%m/%d')
-        filename = f"{str(day).replace('/', '_')}.csv"
-        local_file_path = f"{PROJECT_DIR}/raw_data/{country}/{filename}"
+    for country in countries:
+        country = country.strip()  # Remove any whitespace
+        country_files = existing_s3_files.get(country, set())
+        print(f"\nProcessing {country} - {len(country_files)} existing files found")
         
-        if i % 100 == 0:
-            print(f"Processing {country} - {day}")
+        for i in range(delta.days + 1):
+            day = (start_date + dt.timedelta(days=i)).strftime(format='%Y/%m/%d')
+            filename = f"{str(day).replace('/', '_')}.csv"
+            local_file_path = f"{PROJECT_DIR}/raw_data/{country}/{filename}"
             
-        try:
-            # Check if file already exists in S3 (skip if force is enabled)
-            if not force and filename in country_files:
-                if i % 100 == 0:  # Only print skip message occasionally to reduce output
-                    print(f"File already exists in S3 for {country} - {day}, skipping...")
-                continue
+            if i % 100 == 0:
+                print(f"Processing {country} - {day}")
                 
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-            
-            # Run scraper
-            run_rpscrape(country, day)
-            
-            # Upload to S3
-            upload_to_s3(local_file_path, country)
-            
-        except Exception as e:
-            print(f"Couldn't process data for {country} on {day}: {str(e)}")
+            try:
+                # Check if file already exists in S3 (skip if force is enabled)
+                if not force and filename in country_files:
+                    if i % 100 == 0:  # Only print skip message occasionally to reduce output
+                        print(f"File already exists in S3 for {country} - {day}, skipping...")
+                    continue
+                    
+                # Ensure the directory exists
+                os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+                
+                # Run scraper
+                run_rpscrape(country, day)
+                
+                # Upload to S3
+                upload_to_s3(local_file_path, country)
+                
+            except Exception as e:
+                print(f"Couldn't process data for {country} on {day}: {str(e)}")
