@@ -10,9 +10,6 @@ RUN apt-get update && \
     build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Create necessary directories
-RUN mkdir -p /app/RPScraper/raw_data
-
 # Upgrade pip and install Python dependencies
 COPY requirements.txt requirements.in ./
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -25,7 +22,6 @@ COPY RPScraper/src /app/RPScraper/src/
 COPY RPScraper/courses /app/RPScraper/courses/
 COPY RPScraper/__init__.py /app/RPScraper/
 COPY RPScraper/settings.py /app/RPScraper/
-
 
 # Copy application code
 COPY tests/ /app/tests/
