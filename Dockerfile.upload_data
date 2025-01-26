@@ -1,0 +1,19 @@
+# Use Python 3.9 slim image
+FROM python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy only the necessary files
+COPY RPScraper/settings.py ./RPScraper/
+COPY RPScraper/scripts/process_s3_to_glue.py ./RPScraper/scripts/
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Set Python path to include RPScraper directory
+ENV PYTHONPATH=/app
+
+# Run the script
+CMD ["python", "RPScraper/scripts/process_s3_to_glue.py"]

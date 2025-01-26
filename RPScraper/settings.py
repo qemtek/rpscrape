@@ -70,7 +70,8 @@ SCHEMA_COLUMNS = {
     'horse_cleaned': 'string',
     'jockey_cleaned': 'string',
     'trainer_cleaned': 'string',
-    'year': 'int'
+    'year': 'int',
+    'created_at': 'timestamp'
 }
 
 
@@ -95,4 +96,4 @@ OUTPUT_COLS = ['id', 'date', 'course', 'off', 'race_name', 'type', 'class', 'pat
  'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
  'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned',
- 'jockey_cleaned', 'trainer_cleaned', 'year']
+ 'jockey_cleaned', 'trainer_cleaned', 'year', 'created_at']
