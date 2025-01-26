@@ -22,16 +22,16 @@ def get_existing_s3_files():
     """Get all existing files in S3 bucket organized by country"""
     existing_files = defaultdict(set)
     try:
-        # List all objects in the data prefix
-        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/data/dates/", boto3_session=boto3_session)
+        # List all objects in the rpscrape/data/dates prefix
+        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/rpscrape/data/dates/", boto3_session=boto3_session)
         
         # Organize files by country
         for s3_key in all_files:
-            if s3_key.startswith('data/dates/'):
+            if s3_key.startswith('rpscrape/data/dates/'):
                 parts = s3_key.split('/')
-                if len(parts) == 4:  # data/dates/country/filename
-                    country = parts[2]
-                    filename = parts[3]
+                if len(parts) == 5:  # rpscrape/data/dates/country/filename
+                    country = parts[3]
+                    filename = parts[4]
                     existing_files[country].add(filename)
                     
         print(f"Found existing files in S3 for countries: {list(existing_files.keys())}")
@@ -49,7 +49,7 @@ def upload_to_s3(local_path, country):
     if not os.path.exists(local_path):
         return
         
-    s3_key = f"data/dates/{country}/{os.path.basename(local_path)}"
+    s3_key = f"rpscrape/data/dates/{country}/{os.path.basename(local_path)}"
     s3_path = f"s3://{S3_BUCKET}/{s3_key}"
     
     try:
@@ -74,12 +74,12 @@ if __name__ == "__main__":
     print(f"Countries: {countries}")
     print(f"Force mode: {'enabled' if force else 'disabled'}")
 
-    # Get existing files from S3 at startup
-    existing_s3_files = get_existing_s3_files() if not force else defaultdict(set)
-
-    # Find the number of days between the start and end dates
+    # Calculate date range
     delta = end_date - start_date
-
+    
+    # Get existing files from S3
+    existing_s3_files = get_existing_s3_files()
+    
     for country in countries:
         country = country.strip()  # Remove any whitespace
         country_files = existing_s3_files.get(country, set())
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         for i in range(delta.days + 1):
             day = (start_date + dt.timedelta(days=i)).strftime(format='%Y/%m/%d')
             filename = f"{str(day).replace('/', '_')}.csv"
-            local_file_path = f"{PROJECT_DIR}/dates/{country}/{filename}"
+            local_file_path = f"{PROJECT_DIR}/data/dates/{country}/{filename}"
             
             if i % 100 == 0:
                 print(f"Processing {country} - {day}")
