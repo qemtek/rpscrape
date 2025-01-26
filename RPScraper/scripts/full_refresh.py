@@ -13,7 +13,7 @@ from settings import PROJECT_DIR, boto3_session, S3_BUCKET
 
 def run_rpscrape(country, date):
     try:
-        subprocess.call(f'PYTHONPATH=/app/RPScraper python /app/RPScraper/scripts/rpscrape.py -d {date} -r {country}', shell=True)
+        subprocess.call(f'cd /app/RPScraper && PYTHONPATH=/app/RPScraper python scripts/rpscrape.py -d {date} -r {country}', shell=True)
     except EOFError:
         pass
 
