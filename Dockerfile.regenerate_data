@@ -28,4 +28,4 @@ ENV COUNTRIES=gb,ire
 ENV FORCE=false
 
 # Run the script
-CMD ["poetry", "run", "python", "/app/RPScraper/scripts/full_refresh.py"]
+CMD ["python", "/app/RPScraper/scripts/full_refresh.py"]

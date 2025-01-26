@@ -16,4 +16,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONPATH=/app
 
 # Run the script
-CMD ["poetry", "run", "python", "RPScraper/scripts/process_s3_to_glue.py"]
+CMD ["python", "RPScraper/scripts/process_s3_to_glue.py"]
