@@ -23,17 +23,17 @@ def get_existing_s3_files():
     existing_files = defaultdict(set)
     try:
         # List all objects in the data prefix
-        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/data/", boto3_session=boto3_session)
+        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/data/dates/", boto3_session=boto3_session)
         
         # Organize files by country
         for s3_key in all_files:
-            if s3_key.startswith('data/'):
+            if s3_key.startswith('data/dates/'):
                 parts = s3_key.split('/')
-                if len(parts) == 3:  # data/country/filename
-                    country = parts[1]
-                    filename = parts[2]
+                if len(parts) == 4:  # data/dates/country/filename
+                    country = parts[2]
+                    filename = parts[3]
                     existing_files[country].add(filename)
-        
+                    
         print(f"Found existing files in S3 for countries: {list(existing_files.keys())}")
         for country, files in existing_files.items():
             print(f"{country}: {len(files)} files")
@@ -49,12 +49,14 @@ def upload_to_s3(local_path, country):
     if not os.path.exists(local_path):
         return
         
-    s3_key = f"data/{country}/{os.path.basename(local_path)}"
+    s3_key = f"data/dates/{country}/{os.path.basename(local_path)}"
     s3_path = f"s3://{S3_BUCKET}/{s3_key}"
     
     try:
-        print(f"Uploading {local_path} to {s3_path}")
-        wr.s3.upload(local_path=local_path, path=s3_path, boto3_session=boto3_session)
+        df = pd.read_csv(local_path)
+        df['created_at'] = pd.Timestamp.now()
+        wr.s3.to_csv(df, s3_path, index=False, boto3_session=boto3_session)
+        print(f"Uploaded {local_path} to {s3_path}")
     except Exception as e:
         print(f"Error uploading {local_path} to S3: {str(e)}")
 
@@ -63,7 +65,7 @@ if __name__ == "__main__":
     # Get configuration from environment variables
     date_today = dt.datetime.today().date()
     start_date = pd.to_datetime(os.getenv('START_DATE', '2008-05-28')).date()
-    end_date = pd.to_datetime(os.getenv('END_DATE', (date_today - dt.timedelta(days=1)).strftime('%Y-%m-%d'))).date()
+    end_date = pd.to_datetime(os.getenv('END_DATE', '2008-05-29')).date()
     countries = os.getenv('COUNTRIES', 'gb,ire').lower().split(',')
     force = os.getenv('FORCE', '').lower() in ('true', '1', 'yes')  # Default to False
 
@@ -86,7 +88,7 @@ if __name__ == "__main__":
         for i in range(delta.days + 1):
             day = (start_date + dt.timedelta(days=i)).strftime(format='%Y/%m/%d')
             filename = f"{str(day).replace('/', '_')}.csv"
-            local_file_path = f"{PROJECT_DIR}/data/{country}/{filename}"
+            local_file_path = f"{PROJECT_DIR}/dates/{country}/{filename}"
             
             if i % 100 == 0:
                 print(f"Processing {country} - {day}")

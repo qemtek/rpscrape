@@ -41,7 +41,7 @@ class Pedigree:
         sire = info_sire.text.strip()
                     
         if '(' in sire:
-            region_sire = search('\((.*)\)', sire).groups()[0]
+            region_sire = search(r'\((.*)\)', sire).groups()[0]
         else:
             region_sire = 'GB'
             
