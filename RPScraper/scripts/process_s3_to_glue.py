@@ -9,17 +9,20 @@ import sys
 import datetime as dt
 import awswrangler as wr
 import pandas as pd
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import boto3
 import logging
 from datetime import datetime
 import botocore
 from typing import Literal
+import multiprocessing as mp
+from multiprocessing import Pool
+from functools import partial
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(processName)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -121,137 +124,187 @@ def get_unprocessed_files(max_files: int = None) -> List[str]:
     
     return unprocessed
 
-def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["append", "overwrite", "overwrite_partitions"]="append"):
+def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
+    """Process a batch of files and return statistics
+    
+    Returns:
+        Tuple of (files_processed, rows_processed, input_size, output_size)
+    """
+    try:
+        # Process each file in the batch
+        dfs = []
+        total_input_size = 0
+        s3_client = boto3_session.client('s3')
+        
+        for file_path in batch:
+            try:
+                # Get file size
+                response = s3_client.head_object(Bucket=S3_BUCKET, Key=file_path)
+                file_size = response['ContentLength']
+                total_input_size += file_size
+                
+                # Extract country from file path
+                country = file_path.split('/')[2]  # data/dates/gb/... -> gb
+                logger.info(f"Processing file for country: {country}, size: {file_size/1024:.2f}KB")
+                
+                # Read CSV file using awswrangler
+                df = wr.s3.read_csv(
+                    path=f"s3://{S3_BUCKET}/{file_path}",
+                    boto3_session=boto3_session
+                )
+                
+                # Add country and date
+                df['country'] = country
+                df['date'] = pd.to_datetime(df['date'])
+                
+                # Replace '-' with None for numeric columns
+                numeric_cols = [col for col, dtype in SCHEMA_COLUMNS.items() 
+                             if dtype in ('int', 'double') and col in df.columns]
+                
+                for col in numeric_cols:
+                    # Convert to string first to handle mixed types
+                    df[col] = df[col].astype(str)
+                    df[col] = df[col].replace('-', None)
+                    
+                    # Convert back to float first (handles both int and double)
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # Convert data types
+                try:
+                    for col, dtype in SCHEMA_COLUMNS.items():
+                        if col in df.columns:
+                            try:
+                                if dtype == 'int':
+                                    df[col] = df[col].astype('Int64')  # Use nullable integer type
+                                elif dtype == 'double':
+                                    df[col] = df[col].astype('float64')
+                                elif dtype == 'timestamp':
+                                    df[col] = pd.to_datetime(df[col])
+                                else:
+                                    df[col] = df[col].astype(str)
+                            except Exception as e:
+                                logger.error(f"Error converting column {col} to type {dtype}: {str(e)}")
+                                raise
+                except Exception as e:
+                    logger.error(f"Error during type conversion: {str(e)}")
+                    raise
+                
+                dfs.append(df)
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}: {str(e)}")
+                continue
+        
+        if not dfs:
+            logger.warning("No valid files in batch")
+            return (0, 0, 0, 0)
+            
+        # Combine all DataFrames
+        df = pd.concat(dfs, ignore_index=True)
+        
+        # Ensure all required columns are present
+        for col in OUTPUT_COLS:
+            if col not in df.columns:
+                df[col] = None
+        
+        # Select and order columns
+        df = df[OUTPUT_COLS]
+        
+        # Write to Glue table with date partitioning
+        wr.s3.to_parquet(
+            df=df,
+            path=S3_GLUE_PATH,
+            dataset=True,
+            mode=mode,
+            database=AWS_GLUE_DB,
+            table=AWS_RPSCRAPE_TABLE_NAME,
+            boto3_session=boto3_session,
+            partition_cols=['country', 'date'],
+            compression='snappy',
+            dtype=SCHEMA_COLUMNS
+        )
+        
+        # Mark files as processed
+        for file_path in batch:
+            try:
+                mark_file_processed(file_path)
+            except Exception as e:
+                logger.error(f"Error marking file {file_path} as processed: {str(e)}")
+        
+        return (len(dfs), len(df), total_input_size, 0)
+        
+    except Exception as e:
+        logger.error(f"Error processing batch: {str(e)}")
+        return (0, 0, 0, 0)
+
+def clean_glue_table():
+    """Delete the existing Glue table and its data"""
+    logger.info("Cleaning up existing Glue table and data...")
+    try:
+        # Delete the table if it exists
+        wr.catalog.delete_table_if_exists(
+            database=AWS_GLUE_DB,
+            table=AWS_RPSCRAPE_TABLE_NAME,
+            boto3_session=boto3_session
+        )
+        
+        # Delete all data from S3
+        s3 = boto3_session.client('s3')
+        bucket = S3_GLUE_PATH.split('/')[2]  # s3://bucket/path -> bucket
+        prefix = '/'.join(S3_GLUE_PATH.split('/')[3:])  # s3://bucket/path -> path
+        
+        # List and delete all objects
+        paginator = s3.get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+        
+        for page in pages:
+            if 'Contents' in page:
+                objects = [{'Key': obj['Key']} for obj in page['Contents']]
+                if objects:
+                    s3.delete_objects(
+                        Bucket=bucket,
+                        Delete={'Objects': objects}
+                    )
+        
+        logger.info("Successfully cleaned up Glue table and data")
+    except Exception as e:
+        logger.error(f"Error cleaning up Glue table: {str(e)}")
+        raise
+
+def process_files(file_paths: List[str], batch_size: int = 1000, mode: Literal["append", "overwrite", "overwrite_partitions"]="append"):
     """Process CSV files from S3 and write to Glue table"""
     if not file_paths:
         logger.info("No new files to process")
         return
     
     stats = ProcessingStats()
-    logger.info(f"Processing {len(file_paths)} files in batches of {batch_size}")
+    num_batches = (len(file_paths) + batch_size - 1) // batch_size
+    logger.info(f"Processing {len(file_paths)} files in {num_batches} batches of {batch_size}")
     
-    # Process files in batches to manage memory
-    for i in range(0, len(file_paths), batch_size):
-        batch = file_paths[i:i + batch_size]
-        logger.info(f"Processing batch {i//batch_size + 1}/{(len(file_paths) + batch_size - 1)//batch_size}")
+    # Create batches
+    batches = [file_paths[i:i + batch_size] for i in range(0, len(file_paths), batch_size)]
+    
+    # If mode is overwrite, clean up existing data first
+    if mode == "overwrite":
+        clean_glue_table()
+        # After cleanup, switch to append mode for all batches
+        mode = "append"
+    
+    # Get number of CPUs to use (leave one core free)
+    num_processes = max(1, mp.cpu_count() - 1)
+    logger.info(f"Using {num_processes} processes for parallel processing")
+    
+    # Process batches in parallel
+    with Pool(processes=num_processes) as pool:
+        # Use partial to fix the mode parameter
+        process_batch_with_mode = partial(process_batch, mode=mode)
         
-        try:
-            # Process each file in the batch
-            dfs = []
-            total_input_size = 0
-            s3_client = boto3_session.client('s3')
-            
-            for file_path in batch:
-                try:
-                    # Get file size
-                    response = s3_client.head_object(Bucket=S3_BUCKET, Key=file_path)
-                    file_size = response['ContentLength']
-                    total_input_size += file_size
-                    
-                    # Extract country from file path
-                    country = file_path.split('/')[2]  # data/dates/gb/... -> gb
-                    logger.info(f"Processing file for country: {country}, size: {file_size/1024:.2f}KB")
-                    
-                    # Read CSV file using awswrangler
-                    df = wr.s3.read_csv(
-                        path=f"s3://{S3_BUCKET}/{file_path}",
-                        boto3_session=boto3_session
-                    )
-                    
-                    # Add country and date
-                    df['country'] = country
-                    df['date'] = pd.to_datetime(df['date'])
-                    
-                    # Replace '-' with None for numeric columns
-                    numeric_cols = [col for col, dtype in SCHEMA_COLUMNS.items() 
-                                 if dtype in ('int', 'double') and col in df.columns]
-                    logger.info(f"Processing numeric columns for file {file_path}")
-                    
-                    for col in numeric_cols:
-                        # Convert to string first to handle mixed types
-                        df[col] = df[col].astype(str)
-                        df[col] = df[col].replace('-', None)
-                        
-                        # Convert back to float first (handles both int and double)
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                    
-                    # Convert data types
-                    try:
-                        for col, dtype in SCHEMA_COLUMNS.items():
-                            if col in df.columns:
-                                try:
-                                    if dtype == 'int':
-                                        df[col] = df[col].astype('Int64')  # Use nullable integer type
-                                    elif dtype == 'double':
-                                        df[col] = df[col].astype('float64')
-                                    elif dtype == 'timestamp':
-                                        df[col] = pd.to_datetime(df[col])
-                                    else:
-                                        df[col] = df[col].astype(str)
-                                except Exception as e:
-                                    logger.error(f"Error converting column {col} to type {dtype}: {str(e)}")
-                                    raise
-                    except Exception as e:
-                        logger.error(f"Error during type conversion: {str(e)}")
-                        raise
-                    
-                    dfs.append(df)
-                    
-                except Exception as e:
-                    logger.error(f"Error processing file {file_path}: {str(e)}")
-                    continue
-            
-            if not dfs:
-                logger.warning("No valid files in batch")
-                continue
-                
-            # Combine all DataFrames
-            df = pd.concat(dfs, ignore_index=True)
-            
-            # Ensure all required columns are present
-            for col in OUTPUT_COLS:
-                if col not in df.columns:
-                    df[col] = None
-            
-            # Select and order columns
-            df = df[OUTPUT_COLS]
-            
-            # Write to Glue table with date partitioning
-            wr.s3.to_parquet(
-                df=df,
-                path=S3_GLUE_PATH,
-                dataset=True,
-                mode=mode,
-                database=AWS_GLUE_DB,
-                table=AWS_RPSCRAPE_TABLE_NAME,
-                boto3_session=boto3_session,
-                partition_cols=['country', 'date'],  # Partition by date components and country
-                compression='snappy',  # Add compression for cost savings
-                dtype=SCHEMA_COLUMNS
-            )
-            
-            # Update stats
-            stats.log_batch(
-                num_files=len(dfs),
-                num_rows=len(df),
-                input_size=total_input_size,
-                output_size=0  # We don't track output size for now
-            )
-            
-            # Mark files as processed
-            for file_path in batch:
-                try:
-                    mark_file_processed(file_path)
-                except Exception as e:
-                    logger.error(f"Error marking file {file_path} as processed: {str(e)}")
-            
-        except Exception as e:
-            logger.error(f"Error processing batch: {str(e)}")
-            continue
+        # Process batches and collect results
+        results = pool.map(process_batch_with_mode, batches)
         
-        # Log progress
-        summary = stats.get_summary()
-        logger.info(f"Progress: {summary['files_processed']} files, {summary['rows_processed']} rows")
+        # Update stats with results
+        for files_processed, rows_processed, input_size, output_size in results:
+            stats.log_batch(files_processed, rows_processed, input_size, output_size)
     
     # Log final statistics
     summary = stats.get_summary()
@@ -302,7 +355,7 @@ def main():
     logger.info(f"Found {len(unprocessed_files)} unprocessed files")
     
     # Get batch size from environment
-    batch_size = int(os.getenv("BATCH_SIZE", "200"))
+    batch_size = int(os.getenv("BATCH_SIZE", "1000"))
     logger.info(f"Using batch size: {batch_size}")
     
     # Get and validate MODE from environment
