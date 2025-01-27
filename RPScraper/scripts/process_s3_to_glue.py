@@ -219,16 +219,32 @@ def mark_file_processed(file_path: str):
         logger.error(f"Error marking file {file_path} as processed: {str(e)}")
 
 def main():
-    """Main function to process new files from S3 to Glue"""
+    """Main function to process new files from S3 to Glue
+    
+    Environment Variables:
+        MODE: The mode to use when writing to Glue table. One of:
+            - append: Add new data to existing table (default)
+            - overwrite: Replace entire table with new data
+            - overwrite_partitions: Replace specific partitions with new data
+    """
     logger.info("Starting S3 to Glue processing...")
     
     # Get list of unprocessed files
     unprocessed_files = get_unprocessed_files()
     logger.info(f"Found {len(unprocessed_files)} unprocessed files")
-    MODE = os.getenv("MODE", "append")
+    
+    # Get and validate MODE from environment
+    valid_modes = ["append", "overwrite", "overwrite_partitions"]
+    mode = os.getenv("MODE", "append").lower()
+    
+    if mode not in valid_modes:
+        logger.error(f"Invalid MODE '{mode}'. Must be one of: {', '.join(valid_modes)}")
+        sys.exit(1)
+    
+    logger.info(f"Using mode: {mode}")
     
     # Process files in batches
-    process_files(unprocessed_files, mode=MODE)
+    process_files(unprocessed_files, mode=mode)
 
 if __name__ == "__main__":
     main()
