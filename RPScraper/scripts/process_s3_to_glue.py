@@ -368,7 +368,7 @@ def main():
     # Get list of unprocessed files
     unprocessed_files = get_unprocessed_files(mode=mode, max_files=max_files)
     logger.info(f"Found {len(unprocessed_files)} unprocessed files")
-    
+
     if mode not in valid_modes:
         logger.error(f"Invalid MODE '{mode}'. Must be one of: {', '.join(valid_modes)}")
         sys.exit(1)
