@@ -30,7 +30,8 @@ from settings import (
     SCHEMA_COLUMNS,
     OUTPUT_COLS,
     boto3_session,
-    COL_DTYPES
+    COL_DTYPES,
+    S3_GLUE_PATH
 )
 
 class ProcessingStats:
@@ -156,10 +157,9 @@ def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["a
             df = df[OUTPUT_COLS]
             
             # Write to Glue table with date partitioning
-            output_path = f"s3://{S3_BUCKET}/glue_tables/{AWS_RPSCRAPE_TABLE_NAME}/"
             wr.s3.to_parquet(
                 df=df,
-                path=output_path,
+                path=S3_GLUE_PATH,
                 dataset=True,
                 mode=mode,
                 database=AWS_GLUE_DB,

@@ -2,8 +2,12 @@ import boto3
 import os
 
 PROJECT_DIR =  os.path.dirname(os.path.abspath(__file__))
-S3_BUCKET = 'rpscrape'
 
+# S3 Configuration
+S3_BUCKET = 'rpscrape'
+S3_GLUE_PATH = f"s3://finish-time-predict/rpscrape/"  # Path where Glue table data is stored
+
+# AWS Glue Configuration
 AWS_GLUE_DB = 'finish-time-predict'
 AWS_RPSCRAPE_TABLE_NAME = 'rpscrape'
 
