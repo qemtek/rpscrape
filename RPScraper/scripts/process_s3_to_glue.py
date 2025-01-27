@@ -128,20 +128,21 @@ def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["a
                 for file_path in batch
             )
             
+            # Extract country from file paths
+            countries = [path.split('/')[2] for path in batch]  # data/dates/gb/... -> gb
+            logger.info(f"Processing files for countries: {set(countries)}")
+            
             # Read batch of CSV files directly from S3
             df = wr.s3.read_csv(
                 path=[f"s3://{S3_BUCKET}/{file_path}" for file_path in batch],
                 boto3_session=boto3_session,
             )
             
-            # Extract country from file path (e.g., data/dates/gb/2023/...)
-            df['country'] = df.apply(lambda x: x.name.split('/')[2] if '/' in x.name else '', axis=1)
+            # Add country based on file path
+            df['country'] = pd.Series(countries * (len(df) // len(batch) + 1))[:len(df)]
             
             # Convert date strings to timestamps and extract date parts
             df['date'] = pd.to_datetime(df['date'])
-            df['year'] = df['date'].dt.year
-            df['month'] = df['date'].dt.month
-            df['day'] = df['date'].dt.day
             
             # Add created_at timestamp in UTC
             df['created_at'] = dt.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
