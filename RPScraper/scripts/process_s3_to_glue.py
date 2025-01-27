@@ -325,7 +325,7 @@ def mark_file_processed(file_path: str):
             Bucket=S3_BUCKET,
             CopySource={'Bucket': S3_BUCKET, 'Key': file_path},
             Key=file_path,
-            Metadata={'processed': 'true', 'processed_at': dt.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')},
+            Metadata={'processed': 'true', 'processed_at': dt.datetime.now(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')},
             MetadataDirective='REPLACE'
         )
     except Exception as e:
