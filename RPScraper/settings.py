@@ -26,7 +26,6 @@ SCHEMA_COLUMNS = {
     'date': 'timestamp',
     'course': 'string',
     'off': 'string',
-    # 'name': 'string',
     'type': 'string',
     'class': 'string',
     'pattern': 'string',
@@ -72,10 +71,6 @@ SCHEMA_COLUMNS = {
     "dam_id": 'int',
     "damsire_id": 'int',
     "silk_url": 'string',
-    'horse_cleaned': 'string',
-    'jockey_cleaned': 'string',
-    'trainer_cleaned': 'string',
-    'year': 'int',
     'created_at': 'timestamp'
 }
 

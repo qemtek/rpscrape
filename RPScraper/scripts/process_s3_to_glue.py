@@ -18,6 +18,8 @@ from typing import Literal
 import multiprocessing as mp
 from multiprocessing import Pool
 from functools import partial
+from utils.general import clean_data
+
 
 # Configure logging
 logging.basicConfig(
@@ -156,6 +158,8 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
                 # Add country and date
                 df['country'] = country
                 df['date'] = pd.to_datetime(df['date'])
+
+                df = clean_data(df, country=country)
                 
                 # Replace '-' with None for numeric columns
                 numeric_cols = [col for col, dtype in SCHEMA_COLUMNS.items() 
@@ -165,9 +169,9 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
                     # Convert to string first to handle mixed types
                     df[col] = df[col].astype(str)
                     df[col] = df[col].replace('-', None)
-                    
                     # Convert back to float first (handles both int and double)
                     df[col] = pd.to_numeric(df[col], errors='coerce')
+
                 
                 # Convert data types
                 try:

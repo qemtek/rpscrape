@@ -10,21 +10,13 @@ def convert_off_to_readable_format(x):
     """Convert the 'Off' column into a time object"""
 
     if x[0:2] not in ['10', '11', '12']:
-        x = '0' + x
-    x = x + ' PM'
+        x = '0' + x + ' PM'
+    else:
+        if x[0:2] == '12':
+            x = x + ' PM'
+        else:
+            x = x + ' AM'
     return str(dt.datetime.strptime(x, '%I:%M %p').time())
-
-
-def convert_finish_time_to_seconds(x):
-    """Convert finish time from a time object to seconds
-    """
-    if not isinstance(x, str):
-        return x
-    if x == '-':
-        return None
-    if ':' in x[0:2]:
-        x = '0' + x
-    return float(x[0:2]) * 60 + float(x[3:5]) + float(x[6:8]) / 10
 
 
 def clean_name(x, illegal_symbols="'$@#^(%*)._ ", append_with=None):
@@ -69,14 +61,8 @@ def clean_data(df_in, country):
     df = df.drop_duplicates()
     # Convert the 'Off' column into a time object
     df['off'] = df['off'].apply(lambda x: convert_off_to_readable_format(x))
-    # Remove commas from any comments
-    df['comment'] = df['comment'].astype(str)
-    df['comment'] = df['comment'].apply(lambda x: x.replace(',', ''))
-
     df['time'] = df['secs']
     # Create a unique identifier for each race
-    df['id'] = df.apply(
-        lambda x: hash(f"{x['date']}_{x['course']}_{x['off']}_{x['dist_m']}_{x['age_band']}"), axis=1)
     # Clean up horse name (remove the country indicator from the end and make lower case)
     df['horse_cleaned'] = df['horse'].apply(lambda x: clean_horse_name(x))
     # Clean up dam name (remove the country indicator from the end and make lower case)
@@ -85,20 +71,6 @@ def clean_data(df_in, country):
     df['sire_cleaned'] = df['sire'].apply(lambda x: clean_horse_name(x))
     # Add dam and sire names to horse name to make it unique
     df['horse_cleaned'] = df.apply(lambda x: f"{x['horse_cleaned']}_{x['dam_cleaned']}_{x['sire_cleaned']}", axis=1)
-    # Clean jockey name
-    try:
-        df['jockey_cleaned'] = df['jockey'].apply(lambda x: x.replace('.', '').lower())
-    except:
-        df['jockey_cleaned'] = None
-        df['jockey'] = None
-        df['jockey_id'] = None
-    # Clean trainer name
-    try:
-        df['trainer_cleaned'] = df['trainer'].apply(lambda x: x.replace('.', '').lower())
-    except:
-        df['trainer_cleaned'] = None
-        df['trainer'] = None
-        df['trainer_id'] = None
     return df
 
 
