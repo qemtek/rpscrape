@@ -14,6 +14,7 @@ import boto3
 import logging
 from datetime import datetime
 import botocore
+from typing import Literal
 
 # Configure logging
 logging.basicConfig(
@@ -105,7 +106,7 @@ def get_unprocessed_files() -> List[str]:
     
     return unprocessed
 
-def process_files(file_paths: List[str], batch_size: int = 200):
+def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["append", "overwrite", "overwrite_partitions"]="append"):
     """Process CSV files from S3 and write to Glue table"""
     if not file_paths:
         logger.info("No new files to process")
@@ -131,7 +132,6 @@ def process_files(file_paths: List[str], batch_size: int = 200):
             df = wr.s3.read_csv(
                 path=[f"s3://{S3_BUCKET}/{file_path}" for file_path in batch],
                 boto3_session=boto3_session,
-                dtype=COL_DTYPES  # Use the column types from settings
             )
             
             # Extract country from file path (e.g., data/dates/gb/2023/...)
@@ -160,12 +160,13 @@ def process_files(file_paths: List[str], batch_size: int = 200):
                 df=df,
                 path=output_path,
                 dataset=True,
-                mode='append',
+                mode=mode,
                 database=AWS_GLUE_DB,
                 table=AWS_RPSCRAPE_TABLE_NAME,
                 boto3_session=boto3_session,
-                partition_cols=['year', 'month', 'day', 'country'],  # Partition by date components and country
-                compression='snappy'  # Add compression for cost savings
+                partition_cols=['country', 'date'],  # Partition by date components and country
+                compression='snappy',  # Add compression for cost savings
+                dtype=COL_DTYPES
             )
             
             # Get output size (approximate since we can't easily get the exact parquet size)
@@ -223,9 +224,10 @@ def main():
     # Get list of unprocessed files
     unprocessed_files = get_unprocessed_files()
     logger.info(f"Found {len(unprocessed_files)} unprocessed files")
+    MODE = os.getenv("MODE", "append")
     
     # Process files in batches
-    process_files(unprocessed_files)
+    process_files(unprocessed_files, mode=MODE)
 
 if __name__ == "__main__":
     main()
