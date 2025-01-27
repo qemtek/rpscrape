@@ -6,13 +6,12 @@ Uses AWS Wrangler for efficient S3 to Glue processing.
 
 import os
 import sys
-import datetime as dt
+from datetime import datetime, timezone
 import awswrangler as wr
 import pandas as pd
 from typing import List, Dict, Tuple
 import boto3
 import logging
-from datetime import datetime, timezone
 import botocore
 from typing import Literal
 import multiprocessing as mp
@@ -45,7 +44,7 @@ class ProcessingStats:
         self.rows_processed = 0
         self.input_bytes = 0
         self.output_bytes = 0
-        self.start_time = datetime.now()
+        self.start_time = datetime.now(timezone.utc)
         self.files_not_found = []
     
     def log_batch(self, num_files: int, num_rows: int, input_size: int, output_size: int):
@@ -58,7 +57,7 @@ class ProcessingStats:
         self.files_not_found.append(file_path)
     
     def get_summary(self) -> Dict:
-        duration = (datetime.now() - self.start_time).total_seconds()
+        duration = (datetime.now(timezone.utc) - self.start_time).total_seconds()
         return {
             'files_processed': self.files_processed,
             'rows_processed': self.rows_processed,
@@ -164,7 +163,7 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
                 df['pos'] = df['pos'].astype(str)
                 df['pattern'] = df['pattern'].astype(str)
                 df['prize'] = df['prize'].astype(str)
-                df['created_at'] = datetime.now().isoformat()
+                df['created_at'] = datetime.now(timezone.utc).isoformat()
 
                 df = clean_data(df, country=country)
 
@@ -336,7 +335,7 @@ def mark_file_processed(file_path: str):
             Bucket=S3_BUCKET,
             CopySource={'Bucket': S3_BUCKET, 'Key': file_path},
             Key=file_path,
-            Metadata={'processed': 'true', 'processed_at': dt.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S%z')},
+            Metadata={'processed': 'true', 'processed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S%z')},
             MetadataDirective='REPLACE'
         )
         logger.info(f"Marked {file_path} as processed")
