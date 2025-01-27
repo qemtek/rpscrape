@@ -70,7 +70,7 @@ class ProcessingStats:
             'files_not_found': len(self.files_not_found)
         }
 
-def get_unprocessed_files(max_files: int = None) -> List[str]:
+def get_unprocessed_files(mode, max_files: int = None) -> List[str]:
     """Get list of unprocessed CSV files from S3
     
     Args:
@@ -102,17 +102,20 @@ def get_unprocessed_files(max_files: int = None) -> List[str]:
                 continue
                 
             try:
-                # Check if file is already processed
-                response = s3_client.head_object(
-                    Bucket=S3_BUCKET,
-                    Key=key
-                )
-                metadata = response.get('Metadata', {})
-                if metadata.get('processed') == 'true':
-                    continue
-                    
-                unprocessed.append(key)
-                
+                if mode == 'overwrite':
+                    unprocessed.append(key)
+                else:
+                    # Check if file is already processed
+                    response = s3_client.head_object(
+                        Bucket=S3_BUCKET,
+                        Key=key
+                    )
+                    metadata = response.get('Metadata', {})
+                    if metadata.get('processed') == 'true':
+                        continue
+
+                    unprocessed.append(key)
+
             except s3_client.exceptions.ClientError as e:
                 logger.error(f"Error checking file {key}: {str(e)}")
                 stats.log_file_not_found(key)
@@ -353,18 +356,18 @@ def main():
     if max_files:
         max_files = int(max_files)
         logger.info(f"Will process up to {max_files} files")
-    
-    # Get list of unprocessed files
-    unprocessed_files = get_unprocessed_files(max_files=max_files)
-    logger.info(f"Found {len(unprocessed_files)} unprocessed files")
-    
-    # Get batch size from environment
-    batch_size = int(os.getenv("BATCH_SIZE", "1000"))
-    logger.info(f"Using batch size: {batch_size}")
-    
+
     # Get and validate MODE from environment
     valid_modes = ["append", "overwrite", "overwrite_partitions"]
     mode = os.getenv("MODE", "append").lower()
+
+    # Get batch size from environment
+    batch_size = int(os.getenv("BATCH_SIZE", "1000"))
+    logger.info(f"Using batch size: {batch_size}")
+
+    # Get list of unprocessed files
+    unprocessed_files = get_unprocessed_files(mode=mode, max_files=max_files)
+    logger.info(f"Found {len(unprocessed_files)} unprocessed files")
     
     if mode not in valid_modes:
         logger.error(f"Invalid MODE '{mode}'. Must be one of: {', '.join(valid_modes)}")
