@@ -161,6 +161,10 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
                 df['country'] = country
                 df['date'] = pd.to_datetime(df['date'])
                 df['year'] = df['date'].apply(lambda x: x.year)
+                df['pos'] = df['pos'].astype(str)
+                df['pattern'] = df['pattern'].astype(str)
+                df['prize'] = df['prize'].astype(str)
+                df['created_at'] = datetime.now().isoformat()
 
                 df = clean_data(df, country=country)
 
