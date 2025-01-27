@@ -12,7 +12,7 @@ import pandas as pd
 from typing import List, Dict, Tuple
 import boto3
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import botocore
 from typing import Literal
 import multiprocessing as mp
@@ -336,11 +336,13 @@ def mark_file_processed(file_path: str):
             Bucket=S3_BUCKET,
             CopySource={'Bucket': S3_BUCKET, 'Key': file_path},
             Key=file_path,
-            Metadata={'processed': 'true', 'processed_at': dt.datetime.now(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')},
+            Metadata={'processed': 'true', 'processed_at': dt.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S%z')},
             MetadataDirective='REPLACE'
         )
+        logger.info(f"Marked {file_path} as processed")
     except Exception as e:
         logger.error(f"Error marking file {file_path} as processed: {str(e)}")
+        raise
 
 def main():
     """Main function to process new files from S3 to Glue
