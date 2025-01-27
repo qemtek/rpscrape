@@ -24,14 +24,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from settings import (
-    S3_BUCKET, 
-    AWS_GLUE_DB, 
-    AWS_RPSCRAPE_TABLE_NAME, 
-    SCHEMA_COLUMNS,
-    OUTPUT_COLS,
+    AWS_GLUE_DB,
+    AWS_RPSCRAPE_TABLE_NAME,
+    S3_BUCKET,
+    S3_GLUE_PATH,
     boto3_session,
     COL_DTYPES,
-    S3_GLUE_PATH
+    OUTPUT_COLS,
+    SCHEMA_COLUMNS
 )
 
 class ProcessingStats:
@@ -65,39 +65,53 @@ class ProcessingStats:
             'files_not_found': len(self.files_not_found)
         }
 
-def get_unprocessed_files() -> List[str]:
-    """Get list of unprocessed CSV files from S3"""
+def get_unprocessed_files(max_files: int = None) -> List[str]:
+    """Get list of unprocessed CSV files from S3
+    
+    Args:
+        max_files: Maximum number of files to return. If None, return all unprocessed files.
+    """
     s3_client = boto3_session.client('s3')
+    unprocessed = []
     stats = ProcessingStats()
     
-    # List all CSV files in the data/dates prefix
-    try:
-        all_files = wr.s3.list_objects(f"s3://{S3_BUCKET}/data/dates/", suffix='.csv', boto3_session=boto3_session)
-        logger.info(f"Found {len(all_files)} total CSV files")
-    except Exception as e:
-        logger.error(f"Error listing objects: {str(e)}")
-        return []
+    # Use paginator to avoid loading all files at once
+    paginator = s3_client.get_paginator('list_objects_v2')
+    page_iterator = paginator.paginate(
+        Bucket=S3_BUCKET,
+        Prefix='data/dates/'
+    )
     
-    unprocessed = []
-    for file_path in all_files:
-        try:
-            # Extract just the key part (remove s3://bucket/ prefix if present)
-            key = file_path.replace(f"s3://{S3_BUCKET}/", "") if file_path.startswith("s3://") else file_path
+    for page in page_iterator:
+        if 'Contents' not in page:
+            continue
             
-            # Check if file has been processed by looking at its metadata
-            response = s3_client.head_object(Bucket=S3_BUCKET, Key=key)
-            metadata = response.get('Metadata', {})
-            if 'processed' not in metadata:
+        for obj in page['Contents']:
+            # Stop if we've reached max_files
+            if max_files and len(unprocessed) >= max_files:
+                logger.info(f"Reached maximum files limit: {max_files}")
+                return unprocessed
+                
+            key = obj['Key']
+            if not key.endswith('.csv'):
+                continue
+                
+            try:
+                # Check if file is already processed
+                response = s3_client.head_object(
+                    Bucket=S3_BUCKET,
+                    Key=key
+                )
+                metadata = response.get('Metadata', {})
+                if metadata.get('processed') == 'true':
+                    continue
+                    
                 unprocessed.append(key)
-        except botocore.exceptions.ClientError as e:
-            error_code = int(e.response['Error']['Code'])
-            if error_code == 404:
-                stats.log_file_not_found(file_path)
-                logger.warning(f"File not found: {file_path}")
-            else:
-                logger.error(f"Error checking file {file_path}: {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected error checking file {file_path}: {str(e)}")
+                
+            except s3_client.exceptions.ClientError as e:
+                logger.error(f"Error checking file {key}: {str(e)}")
+                stats.log_file_not_found(key)
+                continue
     
     if stats.files_not_found:
         logger.warning(f"Total files not found: {len(stats.files_not_found)}")
@@ -122,31 +136,77 @@ def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["a
         logger.info(f"Processing batch {i//batch_size + 1}/{(len(file_paths) + batch_size - 1)//batch_size}")
         
         try:
-            # Get input file sizes
+            # Process each file in the batch
+            dfs = []
+            total_input_size = 0
             s3_client = boto3_session.client('s3')
-            input_size = sum(
-                s3_client.head_object(Bucket=S3_BUCKET, Key=file_path)['ContentLength']
-                for file_path in batch
-            )
             
-            # Extract country from file paths
-            countries = [path.split('/')[2] for path in batch]  # data/dates/gb/... -> gb
-            logger.info(f"Processing files for countries: {set(countries)}")
+            for file_path in batch:
+                try:
+                    # Get file size
+                    response = s3_client.head_object(Bucket=S3_BUCKET, Key=file_path)
+                    file_size = response['ContentLength']
+                    total_input_size += file_size
+                    
+                    # Extract country from file path
+                    country = file_path.split('/')[2]  # data/dates/gb/... -> gb
+                    logger.info(f"Processing file for country: {country}, size: {file_size/1024:.2f}KB")
+                    
+                    # Read CSV file using awswrangler
+                    df = wr.s3.read_csv(
+                        path=f"s3://{S3_BUCKET}/{file_path}",
+                        boto3_session=boto3_session
+                    )
+                    
+                    # Add country and date
+                    df['country'] = country
+                    df['date'] = pd.to_datetime(df['date'])
+                    
+                    # Replace '-' with None for numeric columns
+                    numeric_cols = [col for col, dtype in SCHEMA_COLUMNS.items() 
+                                 if dtype in ('int', 'double') and col in df.columns]
+                    logger.info(f"Processing numeric columns for file {file_path}")
+                    
+                    for col in numeric_cols:
+                        # Convert to string first to handle mixed types
+                        df[col] = df[col].astype(str)
+                        df[col] = df[col].replace('-', None)
+                        
+                        # Convert back to float first (handles both int and double)
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                    
+                    # Convert data types
+                    try:
+                        for col, dtype in SCHEMA_COLUMNS.items():
+                            if col in df.columns:
+                                try:
+                                    if dtype == 'int':
+                                        df[col] = df[col].astype('Int64')  # Use nullable integer type
+                                    elif dtype == 'double':
+                                        df[col] = df[col].astype('float64')
+                                    elif dtype == 'timestamp':
+                                        df[col] = pd.to_datetime(df[col])
+                                    else:
+                                        df[col] = df[col].astype(str)
+                                except Exception as e:
+                                    logger.error(f"Error converting column {col} to type {dtype}: {str(e)}")
+                                    raise
+                    except Exception as e:
+                        logger.error(f"Error during type conversion: {str(e)}")
+                        raise
+                    
+                    dfs.append(df)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing file {file_path}: {str(e)}")
+                    continue
             
-            # Read batch of CSV files directly from S3
-            df = wr.s3.read_csv(
-                path=[f"s3://{S3_BUCKET}/{file_path}" for file_path in batch],
-                boto3_session=boto3_session,
-            )
-            
-            # Add country based on file path
-            df['country'] = pd.Series(countries * (len(df) // len(batch) + 1))[:len(df)]
-            
-            # Convert date strings to timestamps and extract date parts
-            df['date'] = pd.to_datetime(df['date'])
-            
-            # Add created_at timestamp in UTC
-            df['created_at'] = dt.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+            if not dfs:
+                logger.warning("No valid files in batch")
+                continue
+                
+            # Combine all DataFrames
+            df = pd.concat(dfs, ignore_index=True)
             
             # Ensure all required columns are present
             for col in OUTPUT_COLS:
@@ -167,29 +227,31 @@ def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["a
                 boto3_session=boto3_session,
                 partition_cols=['country', 'date'],  # Partition by date components and country
                 compression='snappy',  # Add compression for cost savings
-                dtype=COL_DTYPES
+                dtype=SCHEMA_COLUMNS
             )
             
-            # Get output size (approximate since we can't easily get the exact parquet size)
-            output_size = df.memory_usage(deep=True).sum()
-            
-            # Update statistics
+            # Update stats
             stats.log_batch(
-                num_files=len(batch),
+                num_files=len(dfs),
                 num_rows=len(df),
-                input_size=input_size,
-                output_size=output_size
+                input_size=total_input_size,
+                output_size=0  # We don't track output size for now
             )
             
             # Mark files as processed
             for file_path in batch:
-                mark_file_processed(file_path)
-            
-            logger.info(f"Successfully processed batch: {len(df)} rows from {len(batch)} files")
+                try:
+                    mark_file_processed(file_path)
+                except Exception as e:
+                    logger.error(f"Error marking file {file_path} as processed: {str(e)}")
             
         except Exception as e:
-            logger.error(f"Error processing batch: {str(e)}", exc_info=True)
+            logger.error(f"Error processing batch: {str(e)}")
             continue
+        
+        # Log progress
+        summary = stats.get_summary()
+        logger.info(f"Progress: {summary['files_processed']} files, {summary['rows_processed']} rows")
     
     # Log final statistics
     summary = stats.get_summary()
@@ -197,8 +259,6 @@ def process_files(file_paths: List[str], batch_size: int = 200, mode: Literal["a
     logger.info(f"Files processed: {summary['files_processed']}")
     logger.info(f"Rows processed: {summary['rows_processed']}")
     logger.info(f"Input size: {summary['input_size_mb']} MB")
-    logger.info(f"Output size: {summary['output_size_mb']} MB")
-    logger.info(f"Compression ratio: {summary['compression_ratio']}")
     logger.info(f"Duration: {summary['duration_seconds']} seconds")
     logger.info(f"Processing speed: {summary['rows_per_second']} rows/second")
     logger.info(f"Files not found: {summary['files_not_found']}")
@@ -226,12 +286,24 @@ def main():
             - append: Add new data to existing table (default)
             - overwrite: Replace entire table with new data
             - overwrite_partitions: Replace specific partitions with new data
+        BATCH_SIZE: Number of files to process in each batch (default: 200)
+        MAX_FILES: Maximum number of files to process. If not set, process all files.
     """
     logger.info("Starting S3 to Glue processing...")
     
+    # Get max files from environment
+    max_files = os.getenv("MAX_FILES")
+    if max_files:
+        max_files = int(max_files)
+        logger.info(f"Will process up to {max_files} files")
+    
     # Get list of unprocessed files
-    unprocessed_files = get_unprocessed_files()
+    unprocessed_files = get_unprocessed_files(max_files=max_files)
     logger.info(f"Found {len(unprocessed_files)} unprocessed files")
+    
+    # Get batch size from environment
+    batch_size = int(os.getenv("BATCH_SIZE", "200"))
+    logger.info(f"Using batch size: {batch_size}")
     
     # Get and validate MODE from environment
     valid_modes = ["append", "overwrite", "overwrite_partitions"]
@@ -244,7 +316,7 @@ def main():
     logger.info(f"Using mode: {mode}")
     
     # Process files in batches
-    process_files(unprocessed_files, mode=mode)
+    process_files(unprocessed_files, batch_size=batch_size, mode=mode)
 
 if __name__ == "__main__":
     main()

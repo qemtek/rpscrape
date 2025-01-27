@@ -4,11 +4,11 @@ import os
 PROJECT_DIR =  os.path.dirname(os.path.abspath(__file__))
 
 # S3 Configuration
-S3_BUCKET = 'rpscrape'
-S3_GLUE_PATH = f"s3://finish-time-predict/rpscrape/"  # Path where Glue table data is stored
+S3_BUCKET = 'rpscrape'  # For raw data
+S3_GLUE_PATH = "s3://rpscrape/datasets"  # Keep existing Glue table path
 
 # AWS Glue Configuration
-AWS_GLUE_DB = 'finish-time-predict'
+AWS_GLUE_DB = 'finish-time-predict'  # Use existing database
 AWS_RPSCRAPE_TABLE_NAME = 'rpscrape'
 
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -38,7 +38,7 @@ SCHEMA_COLUMNS = {
     'num': 'int',
     'pos': 'string',
     'ran': 'int',
-    'draw': 'int',
+    'draw': 'double',  # Changed from int to double since values are floats
     'btn': 'double',
     'ovr_btn': 'double',
     'horse': 'string',
@@ -49,6 +49,7 @@ SCHEMA_COLUMNS = {
     'lbs': 'int',
     'hg': 'string',
     'time': 'double',
+    'secs': 'double',
     'jockey': 'string',
     'trainer': 'string',
     'or': 'double',
@@ -97,7 +98,7 @@ for key, value in SCHEMA_COLUMNS.items():
 
 OUTPUT_COLS = ['id', 'date', 'course', 'off', 'race_name', 'type', 'class', 'pattern', 'rating_band', 'age_band',
  'sex_rest', 'dist_m', 'going', 'num', 'pos', 'ran', 'draw', 'btn', 'ovr_btn', 'horse',
- 'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
+ 'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'secs', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
  'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned',
  'jockey_cleaned', 'trainer_cleaned', 'year', 'created_at']
