@@ -150,8 +150,7 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
                 
                 # Extract country from file path
                 country = file_path.split('/')[2]  # data/dates/gb/... -> gb
-                logger.info(f"Processing file for country: {country}, size: {file_size/1024:.2f}KB")
-                
+
                 # Read CSV file using awswrangler
                 df = wr.s3.read_csv(
                     path=f"s3://{S3_BUCKET}/{file_path}",
@@ -161,9 +160,10 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
                 # Add country and date
                 df['country'] = country
                 df['date'] = pd.to_datetime(df['date'])
+                df['year'] = df['date'].apply(lambda x: x.year)
 
                 df = clean_data(df, country=country)
-                
+
                 # Replace '-' with None for numeric columns
                 numeric_cols = [col for col, dtype in SCHEMA_COLUMNS.items() 
                              if dtype in ('int', 'double') and col in df.columns]

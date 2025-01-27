@@ -71,6 +71,7 @@ SCHEMA_COLUMNS = {
     "dam_id": 'int',
     "damsire_id": 'int',
     "silk_url": 'string',
+    "year": 'int',
     'horse_cleaned': 'string',
     'created_at': 'timestamp'
 }
