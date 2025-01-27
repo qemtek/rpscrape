@@ -71,6 +71,7 @@ SCHEMA_COLUMNS = {
     "dam_id": 'int',
     "damsire_id": 'int',
     "silk_url": 'string',
+    'horse_cleaned': 'string',
     'created_at': 'timestamp'
 }
 
@@ -93,7 +94,6 @@ for key, value in SCHEMA_COLUMNS.items():
 
 OUTPUT_COLS = ['id', 'date', 'course', 'off', 'race_name', 'type', 'class', 'pattern', 'rating_band', 'age_band',
  'sex_rest', 'dist_m', 'going', 'num', 'pos', 'ran', 'draw', 'btn', 'ovr_btn', 'horse',
- 'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'secs', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
+ 'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
- 'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned',
- 'jockey_cleaned', 'trainer_cleaned', 'year', 'created_at']
+ 'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned', 'year', 'created_at']
