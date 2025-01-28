@@ -38,6 +38,9 @@ def append_to_pdataset(local_path, folder, mode='a', header=False, index=False):
             df['year'] = df['date'].apply(lambda x: x.year)
             # Add created_at timestamp
             df['created_at'] = datetime.now().isoformat()
+            for c in list(SCHEMA_COLUMNS.keys()):
+                if c not in df.columns:
+                    df[c] = None
             df = df[list(SCHEMA_COLUMNS.keys())]
             mode = 'a' if os.path.exists(df_all_dir) else 'w'
             header = False if os.path.exists(df_all_dir) else True

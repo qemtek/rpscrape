@@ -212,6 +212,12 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
         # Combine all DataFrames
         df = pd.concat(dfs, ignore_index=True)
         
+        # Deduplicate based on race_id and horse_id, keeping the latest version
+        initial_len = len(df)
+        df = df.loc[df[['race_id', 'horse_id']].drop_duplicates(keep='last').index, :].reset_index(drop=True)
+        if len(df) != initial_len:
+            logger.warning(f"Removed {initial_len - len(df)} duplicate rows based on race_id and horse_id")
+        
         # Ensure all required columns are present
         for col in OUTPUT_COLS:
             if col not in df.columns:
