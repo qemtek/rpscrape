@@ -235,7 +235,6 @@ def process_batch(batch: List[str], mode: str) -> Tuple[int, int, int, int]:
             database=AWS_GLUE_DB,
             table=AWS_RPSCRAPE_TABLE_NAME,
             boto3_session=boto3_session,
-            partition_cols=['country', 'date'],
             compression='snappy',
             dtype=SCHEMA_COLUMNS
         )

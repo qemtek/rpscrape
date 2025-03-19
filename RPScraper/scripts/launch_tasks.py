@@ -106,7 +106,7 @@ def launch_fargate_task(ecs_client: Any, cluster: str, task_definition: str,
 
 def main():
     parser = argparse.ArgumentParser(description='Launch Fargate tasks for data scraping')
-    parser.add_argument('--cluster', required=True, help='ECS cluster name')
+    parser.add_argument('--cluster', default='horse-racing-trader', help='ECS cluster name')
     parser.add_argument('--task-definition', default='rpscrape-regenerate-data', 
                        help='Task definition name')
     parser.add_argument('--region', default='eu-west-1', help='AWS region')
@@ -131,7 +131,7 @@ def main():
     # Set fixed parameters
     start_date = parse_date('2008-05-28')
     end_date = dt.date.today()
-    countries = ['gb', 'ire']
+    countries = ['gb', 'ire', 'fr']
     
     print(f"Generating tasks from {start_date} to {end_date}")
     print(f"Countries: {', '.join(countries)}")
