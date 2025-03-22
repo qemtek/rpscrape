@@ -29,29 +29,35 @@ def upload_to_s3(local_path, country):
         return False
 
 
-def process_yesterday_data():
-    """Process yesterday's data for all countries"""
-    # Get yesterday's date in the format YYYY/MM/DD
-    yesterday_slash = (dt.datetime.today() - dt.timedelta(days=1)).strftime('%Y/%m/%d')
-    # Convert to the format used in filenames (YYYY_MM_DD)
-    yesterday_underscore = yesterday_slash.replace('/', '_')
+def process_all_data():
+    """Process all data files in the data/dates directory"""
+    countries = ['gb', 'ire', 'fr']  # Add any other countries you want to process
     
-    countries = ['gb', 'ire']  # Same countries as in run_daily_updates.sh
-    
-    print(f"Processing data for date: {yesterday_slash}")
+    print(f"Processing all data files")
     
     for country in countries:
-        local_file_path = f"{PROJECT_DIR}/data/dates/{country}/{yesterday_underscore}.csv"
+        data_dir = f"{PROJECT_DIR}/data/dates/{country}"
         
         # Ensure the directory exists
-        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+        if not os.path.exists(data_dir):
+            print(f"Directory does not exist: {data_dir}")
+            continue
+            
+        # Get all CSV files in the directory
+        files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
         
-        if os.path.exists(local_file_path):
-            print(f"Uploading file for {country} - {yesterday_slash}")
+        if not files:
+            print(f"No CSV files found for {country}")
+            continue
+            
+        print(f"Found {len(files)} files for {country}")
+        
+        # Upload each file
+        for filename in files:
+            local_file_path = os.path.join(data_dir, filename)
+            print(f"Uploading file for {country} - {filename}")
             upload_to_s3(local_file_path, country)
-        else:
-            print(f"File does not exist for {country} - {yesterday_slash}: {local_file_path}")
 
 
 if __name__ == "__main__":
-    process_yesterday_data()
+    process_all_data()
