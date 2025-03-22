@@ -17,4 +17,5 @@ do
   python3 scripts/rpscrape.py -d "$date" -r "$country" || echo "Completed"
 done
 
-python scripts/upload_data_to_s3.py false
+# Use the new simple upload script that matches full_refresh.py processing
+python scripts/simple_upload_to_s3.py
