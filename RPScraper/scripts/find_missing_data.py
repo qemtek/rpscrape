@@ -57,3 +57,6 @@ for date in missing_dates_ire:
 
 for date in missing_dates_fr:
     run_rpscrape('fr', str(date.date()).replace('-', '/'))
+
+from simple_upload_to_s3 import process_all_data
+process_all_data('append')

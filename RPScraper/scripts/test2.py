@@ -125,11 +125,11 @@ def refresh_data_for_range(start_date, end_date, countries=None):
 
 if __name__ == "__main__":
     # Specify date range for repopulation
-    start_date = '2024-10-01'  # October 1st, 2024
-    end_date = '2025-01-22'    # January 22nd, 2025
+    start_date = '2025-03-16'
+    end_date = '2025-05-16'
     
     refresh_data_for_range(
         start_date=start_date,
         end_date=end_date,
-        countries=['gb', 'ire']
+        countries=['gb', 'ire', 'fr']
     )

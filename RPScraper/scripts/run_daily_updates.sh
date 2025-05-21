@@ -3,7 +3,7 @@
 cd RPScraper || exit
 export PYTHONPATH=.
 
-date=$(date +%Y/%m/%d -d "yesterday")
+date=$(date +%Y/%m/%d -d "3 days ago")
 countries=("gb" "ire" "fr")
 
 echo "Running rpscrape for date: $date"
