@@ -97,4 +97,4 @@ OUTPUT_COLS = ['id', 'date', 'course', 'off', 'race_name', 'type', 'class', 'pat
  'sex_rest', 'dist_m', 'going', 'num', 'pos', 'ran', 'draw', 'btn', 'ovr_btn', 'horse',
  'dec', 'age', 'sex', 'lbs', 'hg', 'time', 'jockey', 'trainer', 'or', 'rpr', 'ts', 'prize',
  'sire', 'dam', 'damsire', 'owner', 'comment', 'country', 'course_id', 'race_id', 'horse_id',
- 'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'damsire_id', 'silk_url', 'horse_cleaned', 'year', 'created_at']
+ 'jockey_id', 'trainer_id', 'owner_id', 'dam_id', 'sire_id', 'damsire_id', 'silk_url', 'horse_cleaned', 'year', 'created_at']
