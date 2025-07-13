@@ -68,6 +68,7 @@ SCHEMA_COLUMNS = {
     "trainer_id": 'int',
     "owner_id": 'int',
     "dam_id": 'int',
+    "sire_id": 'int',
     "damsire_id": 'int',
     "silk_url": 'string',
     "year": 'int',
