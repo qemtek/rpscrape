@@ -21,7 +21,7 @@ import subprocess
 import logging
 import argparse
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
