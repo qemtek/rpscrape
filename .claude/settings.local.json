@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(AWS_PROFILE=personal python:*)",
+      "Bash(AWS_PROFILE=personal python3:*)",
+      "Bash(AWS_PROFILE=personal aws logs:*)",
+      "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper AWS_PROFILE=personal python3:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -3,19 +3,37 @@
 cd RPScraper || exit
 export PYTHONPATH=.
 
-date=$(date +%Y/%m/%d -d "3 days ago")
-countries=("gb" "ire" "fr")
+# Configuration
+DAYS_TO_REGENERATE=${DAYS_TO_REGENERATE:-7}  # Default to 7 days, can be overridden by env var
+COUNTRIES=${COUNTRIES:-"gb,ire,fr"}          # Default countries, can be overridden by env var
 
-echo "Running rpscrape for date: $date"
-echo "Running rpscrape for countries: "
-ls
-echo "${countries[@]}"
+echo "=========================================="
+echo "DAILY UPDATE: Regenerate Last ${DAYS_TO_REGENERATE} Days"
+echo "=========================================="
+echo "Countries: ${COUNTRIES}"
+echo "Date range: Last ${DAYS_TO_REGENERATE} days"
+echo ""
 
-for country in "${countries[@]}"
-do
-  echo "Running scraper. Date: $date, Country: $country"
-  python3 scripts/rpscrape.py -d "$date" -r "$country" || echo "Completed"
-done
+# Run the safe rescrape workflow
+# This will:
+# 1. Clean local directory
+# 2. Delete existing data from Glue for last N days
+# 3. Re-scrape those dates
+# 4. Upload to S3 and Glue
+# 5. Clean up local files
+python3 scripts/rescrape_last_7_days.py \
+  --days "${DAYS_TO_REGENERATE}" \
+  --countries "${COUNTRIES}" \
+  --yes
 
-# Use the new simple upload script that matches full_refresh.py processing
-python scripts/simple_upload_to_s3.py
+exit_code=$?
+
+if [ $exit_code -eq 0 ]; then
+  echo ""
+  echo "✓ Daily update completed successfully"
+  exit 0
+else
+  echo ""
+  echo "✗ Daily update failed with exit code ${exit_code}"
+  exit $exit_code
+fi
