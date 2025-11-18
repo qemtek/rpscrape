@@ -17,6 +17,11 @@ class VoidRaceError(Exception):
     pass
 
 
+class RaceParseError(Exception):
+    """Raised when race page cannot be parsed - likely due to HTTP 406 or missing HTML elements"""
+    pass
+
+
 class Race:
     def __init__(self, url, document, code, fields):
         self.url = url
@@ -669,7 +674,13 @@ class Race:
         return wgt, lbs
 
     def get_winning_time(self):
-        result_info = self.doc.xpath('//div[@class="rp-raceInfo"]/ul/li')[0]
+        try:
+            result_info = self.doc.xpath('//div[@class="rp-raceInfo"]/ul/li')[0]
+        except IndexError:
+            # Raise exception instead of silently returning None
+            # This allows the caller to retry or log the failure
+            raise RaceParseError(f'Could not find race info elements (likely HTTP 406 block): {self.url}')
+
         time_info = result_info.findall('.//span[@class="rp-raceInfo__value"]')
 
         n = len(time_info)

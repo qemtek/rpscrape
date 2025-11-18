@@ -11,15 +11,23 @@ from orjson import loads
 from utils.argparser import ArgParser
 from utils.completer import Completer
 from utils.header import RandomHeader
-from utils.race import Race, VoidRaceError
+from utils.race import Race, VoidRaceError, RaceParseError
 from utils.rpscrape_settings import Settings
 from utils.update import Update
+import time
+import logging
 
 from utils.course import course_name, courses
 from utils.lxml_funcs import xpath
 
 settings = Settings()
 random_header = RandomHeader()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 
 @dataclass
@@ -98,23 +106,83 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
         os.makedirs(out_dir)
 
     file_path = f'{out_dir}/{file_name}.{file_extension}'
+    failure_log_path = f'{out_dir}/{file_name}_failures.log'
+
+    # Track failures for logging
+    failed_races = []
 
     with file_writer(file_path) as csv:
         csv.write(settings.csv_header + '\n')
 
         for url in races:
-            r = requests.get(url, headers=random_header.header())
-            doc = html.fromstring(r.content)
+            max_retries = 3
+            retry_delay = 2  # seconds
 
-            try:
-                race = Race(url, doc, code, settings.fields)
-            except VoidRaceError:
-                continue
+            for attempt in range(max_retries):
+                try:
+                    r = requests.get(url, headers=random_header.header())
 
-            for row in race.csv_data:
-                csv.write(row + '\n')
+                    # Check for HTTP error status
+                    if r.status_code != 200:
+                        if attempt < max_retries - 1:
+                            logging.warning(f'HTTP {r.status_code} for {url}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})')
+                            time.sleep(retry_delay)
+                            continue
+                        else:
+                            logging.error(f'HTTP {r.status_code} for {url} after {max_retries} attempts')
+                            failed_races.append({'url': url, 'reason': f'HTTP {r.status_code}', 'attempts': max_retries})
+                            break
 
-        print(f'Finished scraping.\n{file_name}.{file_extension} saved in rpscrape/{out_dir.lstrip("../")}')
+                    doc = html.fromstring(r.content)
+                    race = Race(url, doc, code, settings.fields)
+
+                    # Success - write data and break retry loop
+                    for row in race.csv_data:
+                        csv.write(row + '\n')
+                    break
+
+                except VoidRaceError:
+                    # Void races are expected - don't retry
+                    break
+
+                except RaceParseError as e:
+                    # Parse errors (likely HTTP 406) - retry with backoff
+                    if attempt < max_retries - 1:
+                        logging.warning(f'Parse error for {url}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        logging.error(f'Failed to parse {url} after {max_retries} attempts: {str(e)}')
+                        failed_races.append({'url': url, 'reason': 'Parse error (likely HTTP 406)', 'attempts': max_retries})
+                        break
+
+                except Exception as e:
+                    # Unexpected errors - log and retry
+                    if attempt < max_retries - 1:
+                        logging.warning(f'Unexpected error for {url}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        logging.error(f'Unexpected error for {url} after {max_retries} attempts: {str(e)}')
+                        failed_races.append({'url': url, 'reason': f'Unexpected: {str(e)}', 'attempts': max_retries})
+                        break
+
+    # Write failure log if there were any failures
+    if failed_races:
+        with open(failure_log_path, 'w') as f:
+            f.write(f'Failed to scrape {len(failed_races)} races:\n\n')
+            for failure in failed_races:
+                f.write(f"URL: {failure['url']}\n")
+                f.write(f"Reason: {failure['reason']}\n")
+                f.write(f"Attempts: {failure['attempts']}\n\n")
+        print(f'WARNING: {len(failed_races)} races failed to scrape. See {failure_log_path}')
+
+    print(f'Finished scraping.\n{file_name}.{file_extension} saved in rpscrape/{out_dir.lstrip("../")}')
+    if failed_races:
+        print(f'Failed races: {len(failed_races)}')
+        return failed_races
+    return []
 
 
 def writer_csv(file_path):
