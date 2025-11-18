@@ -140,6 +140,7 @@ def upload_to_glue(dataframes, mode="append"):
             mode=mode,
             database=AWS_GLUE_DB,
             table=AWS_RPSCRAPE_TABLE_NAME,
+            partition_cols=['country', 'date'],
             boto3_session=boto3_session,
             compression='snappy',
             dtype=SCHEMA_COLUMNS
@@ -228,7 +229,7 @@ def process_all_data(mode="append"):
 
 if __name__ == "__main__":
     # Get mode from environment variable or use default
-    mode = os.getenv("MODE", "append").lower()
+    mode = os.getenv("MODE", "overwrite_partitions").lower()
     valid_modes = ["append", "overwrite", "overwrite_partitions"]
     
     if mode not in valid_modes:

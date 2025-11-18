@@ -4,7 +4,11 @@
       "Bash(AWS_PROFILE=personal python:*)",
       "Bash(AWS_PROFILE=personal python3:*)",
       "Bash(AWS_PROFILE=personal aws logs:*)",
-      "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper AWS_PROFILE=personal python3:*)"
+      "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper AWS_PROFILE=personal python3:*)",
+      "Bash(AWS_PROFILE=personal aws ecs:*)",
+      "Bash(tee:*)",
+      "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper python3:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
