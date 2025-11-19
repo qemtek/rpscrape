@@ -56,20 +56,24 @@ def run_full_refresh(start_date: dt.date, end_date: dt.date, countries: List[str
 
     countries_str = ",".join(countries)
     cmd = [
-        "python3", f"{PROJECT_DIR}/scripts/full_refresh.py",
-        "--start-date", start_date.strftime("%Y-%m-%d"),
-        "--end-date", end_date.strftime("%Y-%m-%d"),
-        "--countries", countries_str,
-        "--force"  # Always force overwrite of local files
+        "python3", f"{PROJECT_DIR}/scripts/full_refresh.py"
     ]
 
-    logger.info(f"Running: {' '.join(cmd)}")
+    # full_refresh.py reads from environment variables, not command-line args
+    env = os.environ.copy()
+    env["START_DATE"] = start_date.strftime("%Y-%m-%d")
+    env["END_DATE"] = end_date.strftime("%Y-%m-%d")
+    env["COUNTRIES"] = countries_str
+    env["FORCE"] = "true"  # Always force overwrite of local files
+    env["PYTHONPATH"] = PROJECT_DIR
+
+    logger.info(f"Running: START_DATE={env['START_DATE']} END_DATE={env['END_DATE']} COUNTRIES={env['COUNTRIES']} FORCE=true {' '.join(cmd)}")
 
     if dry_run:
         logger.warning("[DRY RUN] Would run scrape command")
         return 0
 
-    result = subprocess.run(cmd, cwd=PROJECT_DIR)
+    result = subprocess.run(cmd, env=env, cwd=PROJECT_DIR)
     return result.returncode
 
 
