@@ -3,14 +3,13 @@ import os
 from pathlib import Path
 
 class RandomHeader:
-
     def __init__(self) -> None:
-        self.user_agents = []
+        self.user_agents: list[str] = []
         self.load_user_agents()
 
-    def header(self):
+    def header(self) -> dict[str, str]:
         return {
-            'Accept': 'text/html,application/xhtml+xml,application/xml',
+            'Accept': '*/*',
             'Accept-Encoding': 'gzip, deflate, br',
             'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
             'Referer': 'https://www.google.com/',
@@ -18,7 +17,7 @@ class RandomHeader:
             'Connection': 'keep-alive',
             'X-Forwarded-For': self.random_ip(),
             'User-Agent': choice(self.user_agents),
-            'Upgrade-Insecure-Requests': '1'
+            'Upgrade-Insecure-Requests': '1',
         }
 
     def load_user_agents(self):
@@ -27,5 +26,5 @@ class RandomHeader:
             for line in f:
                 self.user_agents.append(line.strip())
 
-    def random_ip(self):
+    def random_ip(self) -> str:
         return '{}.{}.{}.{}'.format(*sample(range(0, 255), 4))

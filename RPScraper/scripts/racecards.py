@@ -6,9 +6,10 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 from lxml import etree, html
-from orjson import loads, dumps
+from orjson import loads, dumps, OPT_NON_STR_KEYS
 from re import search
 
+from utils.cleaning import normalize_name
 from utils.going import get_surface
 from utils.header import RandomHeader
 from utils.lxml_funcs import find
@@ -18,13 +19,6 @@ from utils.stats import Stats
 
 
 random_header = RandomHeader()
-
-
-def clean_name(name):
-    if name:
-        return name.strip().replace("'", '').lower().title()
-    else:
-        return ''
 
 
 def distance_to_furlongs(distance):
@@ -58,7 +52,12 @@ def get_odds(session, url):
 
 
 def get_going_info(session, date):
-    r = session.get(f'https://www.racingpost.com/non-runners/{date}', headers=random_header.header())
+    url_going_info = f'https://www.racingpost.com/non-runners/{date}'
+    r = session.get(url_going_info, headers=random_header.header())
+
+    while r.status_code == 406:
+        r = session.get(url_going_info, headers=random_header.header())
+
     doc = html.fromstring(r.content.decode())
 
     json_str = (
@@ -142,6 +141,10 @@ def get_race_type(doc, race, distance):
 
 def get_race_urls(session, racecard_url):
     r = session.get(racecard_url, headers=random_header.header())
+
+    while r.status_code == 406:
+        r = session.get(racecard_url, headers=random_header.header())
+
     doc = html.fromstring(r.content)
 
     race_urls = []
@@ -160,6 +163,10 @@ def get_runners(session, profile_urls):
 
     for url in profile_urls:
         r = session.get(url, headers=random_header.header())
+
+        while r.status_code == 406:
+            r = session.get(url, headers=random_header.header())
+
         doc = html.fromstring(r.content)
 
         runner = {}
@@ -188,7 +195,7 @@ def get_runners(session, profile_urls):
             runner['age'] = int(age.split('-')[0])
 
         runner['horse_id'] = js['profile']['horseUid']
-        runner['name'] = clean_name(js['profile']['horseName'])
+        runner['name'] = normalize_name(js['profile']['horseName'])
         runner['dob'] = js['profile']['horseDateOfBirth'].split('T')[0]
         runner['sex'] = js['profile']['horseSex']
         runner['sex_code'] = js['profile']['horseSexCode']
@@ -196,20 +203,20 @@ def get_runners(session, profile_urls):
         runner['region'] = js['profile']['horseCountryOriginCode']
 
         runner['breeder'] = js['profile']['breederName']
-        runner['dam'] = clean_name(js['profile']['damHorseName'])
+        runner['dam'] = normalize_name(js['profile']['damHorseName'])
         runner['dam_region'] = js['profile']['damCountryOriginCode']
-        runner['sire'] = clean_name(js['profile']['sireHorseName'])
+        runner['sire'] = normalize_name(js['profile']['sireHorseName'])
         runner['sire_region'] = js['profile']['sireCountryOriginCode']
-        runner['grandsire'] = clean_name(js['profile']['siresSireName'])
-        runner['damsire'] = clean_name(js['profile']['damSireHorseName'])
+        runner['grandsire'] = normalize_name(js['profile']['siresSireName'])
+        runner['damsire'] = normalize_name(js['profile']['damSireHorseName'])
         runner['damsire_region'] = js['profile']['damSireCountryOriginCode']
 
-        runner['trainer'] = clean_name(js['profile']['trainerName'])
+        runner['trainer'] = normalize_name(js['profile']['trainerName'])
         runner['trainer_id'] = js['profile']['trainerUid']
         runner['trainer_location'] = js['profile']['trainerLocation']
         runner['trainer_14_days'] = js['profile']['trainerLast14Days']
 
-        runner['owner'] = clean_name(js['profile']['ownerName'])
+        runner['owner'] = normalize_name(js['profile']['ownerName'])
 
         runner['prev_trainers'] = js['profile']['previousTrainers']
 
@@ -413,9 +420,9 @@ def parse_races(session, race_urls, date):
                 dam = find(horse, 'a', 'RC-pedigree__dam').split('(')
                 damsire = find(horse, 'a', 'RC-pedigree__damsire').lstrip('(').rstrip(')').split('(')
 
-                runners[horse_id]['sire'] = clean_name(sire[0])
-                runners[horse_id]['dam'] = clean_name(dam[0])
-                runners[horse_id]['damsire'] = clean_name(damsire[0])
+                runners[horse_id]['sire'] = normalize_name(sire[0])
+                runners[horse_id]['dam'] = normalize_name(dam[0])
+                runners[horse_id]['damsire'] = normalize_name(damsire[0])
 
                 runners[horse_id]['sire_region'] = sire[1].replace(')', '').strip()
                 runners[horse_id]['dam_region'] = dam[1].replace(')', '').strip()
@@ -430,7 +437,7 @@ def parse_races(session, race_urls, date):
                 runners[horse_id]['colour'] = sex[0]
                 runners[horse_id]['sex_code'] = sex[1].capitalize()
 
-                runners[horse_id]['trainer'] = clean_name(
+                runners[horse_id]['trainer'] = normalize_name(
                     find(horse, 'a', 'RC-cardPage-runnerTrainer-name', attrib='data-order-trainer')
                 )
 
@@ -480,7 +487,7 @@ def parse_races(session, race_urls, date):
             jockey = horse.find('.//a[@data-test-selector="RC-cardPage-runnerJockey-name"]')
 
             if jockey is not None:
-                jock = clean_name(jockey.attrib['data-order-jockey'])
+                jock = normalize_name(jockey.attrib['data-order-jockey'])
                 runners[horse_id]['jockey'] = jock if not claim else jock + f'({claim})'
                 runners[horse_id]['jockey_id'] = int(jockey.attrib['href'].split('/')[3])
             else:
@@ -556,7 +563,7 @@ def main():
         os.makedirs('../racecards')
 
     with open(f'racecards/{date}.json', 'w', encoding='utf-8') as f:
-        f.write(dumps(races).decode('utf-8'))
+        f.write(dumps(races, option=OPT_NON_STR_KEYS).decode('utf-8'))
 
 
 if __name__ == '__main__':
