@@ -7,8 +7,20 @@ from settings import PROJECT_DIR, S3_BUCKET
 
 
 def convert_off_to_readable_format(x):
-    """Convert the 'Off' column into a time object"""
+    """Convert the 'Off' column into a time object.
 
+    Handles both old format (6:45) and new 24-hour format (18:45).
+    """
+    x = str(x).strip()
+
+    # New format: already in 24-hour time (e.g., '18:45')
+    if ':' in x and len(x.split(':')[0]) == 2:
+        try:
+            return str(dt.datetime.strptime(x, '%H:%M').time())
+        except ValueError:
+            pass
+
+    # Old format: needs AM/PM conversion (e.g., '6:45')
     if x[0:2] not in ['10', '11', '12']:
         x = '0' + x + ' PM'
     else:

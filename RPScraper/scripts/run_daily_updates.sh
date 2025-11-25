@@ -1,7 +1,7 @@
 #!/bin/bash
 
-cd RPScraper || exit
-export PYTHONPATH=.
+cd /app/RPScraper || exit
+export PYTHONPATH=/app/RPScraper:/app/RPScraper/scripts
 
 # Configuration
 DAYS_TO_REGENERATE=${DAYS_TO_REGENERATE:-7}  # Default to 7 days, can be overridden by env var

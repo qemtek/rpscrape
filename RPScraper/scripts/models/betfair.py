@@ -2,9 +2,10 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from orjson import dumps
-from typing import Any
+from typing import Any, Dict, List, Tuple
 
-type BSPMap = dict[tuple[str, str, str], list[BSP]]
+# Type alias compatible with Python 3.9+
+BSPMap = Dict[Tuple[str, str, str], List['BSP']]
 
 
 @dataclass

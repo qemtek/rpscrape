@@ -3,15 +3,17 @@ import sys
 
 from datetime import date, datetime
 from argparse import ArgumentParser
+from typing import Dict, List, Optional, Tuple, Union
 
 from utils.region import print_regions, valid_region, region_search
 from utils.date import check_date, get_dates, parse_years, valid_years
 from utils.course import course_name, course_search, courses, print_courses, valid_course
 
-type ArgDict = (
-    dict[str, str | None | list[str] | list[date] | list[tuple[str, str | None]]]
-    | dict[str, str | list[date]]
-)
+# Type alias compatible with Python 3.9+
+ArgDict = Union[
+    Dict[str, Union[str, None, List[str], List[date], List[Tuple[str, Optional[str]]]]],
+    Dict[str, Union[str, List[date]]]
+]
 
 HELP_TEXT = (
     'Run:\n'

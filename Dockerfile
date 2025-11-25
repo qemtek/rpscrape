@@ -21,10 +21,13 @@ COPY tests/ /app/tests/
 
 # Set environment variables
 ENV PROJECTSPATH=/app/RPScraper
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/RPScraper:/app/RPScraper/scripts
+
+# Set working directory for scripts
+WORKDIR /app/RPScraper
 
 # Set execute permissions for scripts
-RUN chmod +x RPScraper/scripts/run_daily_updates.sh
+RUN chmod +x scripts/run_daily_updates.sh
 
 # Default command to run daily updates
 CMD ["/app/RPScraper/scripts/run_daily_updates.sh"]

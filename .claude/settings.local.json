@@ -8,7 +8,10 @@
       "Bash(AWS_PROFILE=personal aws ecs:*)",
       "Bash(tee:*)",
       "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper python3:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git fetch:*)",
+      "Bash(source:*)",
+      "Bash(AWS_PROFILE=personal PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper python3:*)"
     ],
     "deny": [],
     "ask": []

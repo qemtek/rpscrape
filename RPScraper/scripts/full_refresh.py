@@ -13,9 +13,16 @@ from settings import PROJECT_DIR, boto3_session, S3_BUCKET
 
 def run_rpscrape(country, date):
     try:
-        subprocess.call(f'cd /app/RPScraper && PYTHONPATH=/app/RPScraper python scripts/rpscrape.py -d {date} -r {country}', shell=True)
+        result = subprocess.run(
+            f'cd {PROJECT_DIR} && PYTHONPATH={PROJECT_DIR} python scripts/rpscrape.py -d {date} -r {country}',
+            shell=True,
+            capture_output=False,  # Let output go to stdout/stderr
+            text=True
+        )
+        return result.returncode
     except EOFError:
         pass
+    return 0
 
 
 def get_existing_s3_files():
