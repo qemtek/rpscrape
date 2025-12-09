@@ -168,6 +168,9 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                         failed_races.append({'url': url, 'reason': f'Unexpected: {str(e)}', 'attempts': max_retries})
                         break
 
+            # Rate limiting: delay between each race request to avoid HTTP 406 errors
+            time.sleep(1)
+
     # Write failure log if there were any failures
     if failed_races:
         with open(failure_log_path, 'w') as f:
