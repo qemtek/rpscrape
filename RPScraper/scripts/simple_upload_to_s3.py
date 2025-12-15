@@ -32,22 +32,86 @@ logger = logging.getLogger(__name__)
 
 
 def upload_to_s3(local_path, country):
-    """Upload file to S3 using the same logic as full_refresh.py"""
+    """Upload file to S3 using timestamped paths (append-only)"""
     if not os.path.exists(local_path):
         return False
-        
-    s3_key = f"data/dates/{country}/{os.path.basename(local_path)}"
+
+    # Extract date from filename (e.g., "2025_12_04.csv" -> "2025_12_04")
+    basename = os.path.basename(local_path)
+    date_str = basename.replace('.csv', '')
+
+    # Create timestamped filename
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+    timestamped_filename = f"scrape_{timestamp}.csv"
+
+    # Use subdirectory structure: data/dates/{country}/{date}/scrape_{timestamp}.csv
+    s3_key = f"data/dates/{country}/{date_str}/{timestamped_filename}"
     s3_path = f"s3://{S3_BUCKET}/{s3_key}"
-    
+
     try:
         df = pd.read_csv(local_path)
-        df['created_at'] = pd.Timestamp.now()
+        df['created_at'] = pd.Timestamp.now(timezone.utc)
         wr.s3.to_csv(df, s3_path, index=False, boto3_session=boto3_session)
-        print(f"Uploaded {local_path} to {s3_path}")
+        logger.info(f"Uploaded {local_path} to {s3_path}")
         return s3_key, df
     except Exception as e:
-        print(f"Error uploading {local_path} to S3: {str(e)}")
+        logger.error(f"Error uploading {local_path} to S3: {str(e)}")
         return None, None
+
+
+def download_existing_glue_data(partitions):
+    """
+    Download existing data from Glue for specific partitions.
+
+    Args:
+        partitions: List of (country, date) tuples to download
+
+    Returns:
+        DataFrame with existing data, or None if no data exists
+    """
+    if not partitions:
+        return None
+
+    try:
+        # Build SQL WHERE clause for partitions
+        conditions = []
+        for country, date in partitions:
+            # date should be in YYYY-MM-DD format
+            if isinstance(date, str):
+                date_str = date
+            else:
+                date_str = date.strftime('%Y-%m-%d')
+            conditions.append(f"(country = '{country}' AND date = DATE('{date_str}'))")
+
+        where_clause = " OR ".join(conditions)
+
+        query = f"""
+        SELECT *
+        FROM {AWS_RPSCRAPE_TABLE_NAME}
+        WHERE {where_clause}
+        """
+
+        logger.info(f"Downloading existing Glue data for {len(partitions)} partitions...")
+        logger.debug(f"Query: {query}")
+
+        df = wr.athena.read_sql_query(
+            query,
+            database=AWS_GLUE_DB,
+            boto3_session=boto3_session,
+            ctas_approach=False  # Don't create temp tables
+        )
+
+        if df.empty:
+            logger.info("No existing data found in Glue for these partitions")
+            return None
+
+        logger.info(f"Downloaded {len(df)} existing rows from Glue")
+        return df
+
+    except Exception as e:
+        logger.warning(f"Error downloading existing Glue data: {str(e)}")
+        logger.warning("Continuing without existing data (will overwrite partitions)")
+        return None
 
 
 def process_dataframe_for_glue(df, country):
@@ -109,29 +173,65 @@ def process_dataframe_for_glue(df, country):
         return None
 
 
-def upload_to_glue(dataframes, mode="append"):
-    """Upload processed dataframes to Glue"""
+def upload_to_glue(dataframes, existing_df=None, mode="append"):
+    """
+    Upload processed dataframes to Glue, optionally merging with existing data.
+
+    Args:
+        dataframes: List of new dataframes to upload
+        existing_df: Existing data from Glue (optional, for merge mode)
+        mode: Upload mode (append, overwrite, overwrite_partitions)
+    """
     if not dataframes or all(df is None for df in dataframes):
         logger.warning("No valid dataframes to upload to Glue")
         return False
-    
+
     # Filter out None values and empty dataframes
     valid_dfs = [df for df in dataframes if df is not None and not df.empty]
-    
+
     if not valid_dfs:
         logger.warning("No valid dataframes to upload to Glue")
         return False
-    
+
     try:
-        # Combine all DataFrames
-        combined_df = pd.concat(valid_dfs, ignore_index=True)
-        
-        # Deduplicate based on race_id and horse_id, keeping the latest version
+        # Combine all new DataFrames
+        new_df = pd.concat(valid_dfs, ignore_index=True)
+        logger.info(f"Combined {len(valid_dfs)} new dataframes into {len(new_df)} rows")
+
+        # Merge with existing data if provided
+        if existing_df is not None and not existing_df.empty:
+            logger.info(f"Merging with {len(existing_df)} existing rows from Glue")
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            logger.info(f"Total rows after merge: {len(combined_df)}")
+        else:
+            combined_df = new_df
+
+        # Ensure created_at is datetime for proper comparison
+        if 'created_at' in combined_df.columns:
+            combined_df['created_at'] = pd.to_datetime(combined_df['created_at'])
+
+        # Deduplicate based on race_id and horse_id, keeping the row with latest created_at
         initial_len = len(combined_df)
-        combined_df = combined_df.loc[combined_df[['race_id', 'horse_id']].drop_duplicates(keep='last').index, :].reset_index(drop=True)
-        if len(combined_df) != initial_len:
-            logger.warning(f"Removed {initial_len - len(combined_df)} duplicate rows based on race_id and horse_id")
-        
+
+        # Sort by created_at descending so latest records come first
+        combined_df = combined_df.sort_values('created_at', ascending=False)
+
+        # Drop duplicates keeping first (which is latest due to sort)
+        combined_df = combined_df.drop_duplicates(subset=['race_id', 'horse_id'], keep='first')
+
+        # Reset index
+        combined_df = combined_df.reset_index(drop=True)
+
+        duplicates_removed = initial_len - len(combined_df)
+        if duplicates_removed > 0:
+            logger.info(f"Removed {duplicates_removed} duplicate rows (kept latest based on created_at)")
+
+        # Convert created_at back to ISO format string for Glue
+        if 'created_at' in combined_df.columns:
+            combined_df['created_at'] = combined_df['created_at'].apply(
+                lambda x: x.isoformat() if pd.notna(x) else None
+            )
+
         # Write to Glue table with date partitioning
         wr.s3.to_parquet(
             df=combined_df,
@@ -145,10 +245,10 @@ def upload_to_glue(dataframes, mode="append"):
             compression='snappy',
             dtype=SCHEMA_COLUMNS
         )
-        
+
         logger.info(f"Successfully uploaded {len(combined_df)} rows to Glue table {AWS_RPSCRAPE_TABLE_NAME}")
         return True
-    
+
     except Exception as e:
         logger.error(f"Error uploading to Glue: {str(e)}")
         return False
@@ -175,50 +275,64 @@ def mark_file_processed(file_path):
 def process_all_data(mode="append"):
     """Process all data files in the data/dates directory and upload to S3 and Glue"""
     countries = ['gb', 'ire', 'fr']  # Add any other countries you want to process
-    
+
     logger.info(f"Processing all data files with mode={mode}")
-    
+
     s3_keys = []
     dataframes = []
-    
+    partitions = set()  # Track (country, date) partitions we're updating
+
     for country in countries:
         data_dir = f"{PROJECT_DIR}/data/dates/{country}"
-        
+
         # Ensure the directory exists
         if not os.path.exists(data_dir):
             logger.warning(f"Directory does not exist: {data_dir}")
             continue
-            
+
         # Get all CSV files in the directory
         files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
-        
+
         if not files:
             logger.warning(f"No CSV files found for {country}")
             continue
-            
+
         logger.info(f"Found {len(files)} files for {country}")
-        
+
         # Upload each file to S3 and prepare for Glue
         for filename in files:
             local_file_path = os.path.join(data_dir, filename)
             logger.info(f"Uploading file for {country} - {filename}")
-            
+
             # Upload to S3
             s3_key, df = upload_to_s3(local_file_path, country)
-            
+
             if s3_key:
                 s3_keys.append(s3_key)
-                
+
                 # Process dataframe for Glue
                 processed_df = process_dataframe_for_glue(df, country)
                 if processed_df is not None:
                     dataframes.append(processed_df)
-    
+
+                    # Track partitions being updated
+                    # Extract unique dates from this dataframe
+                    dates = processed_df['date'].unique()
+                    for date in dates:
+                        partitions.add((country, pd.Timestamp(date).strftime('%Y-%m-%d')))
+
     # Upload processed dataframes to Glue
     if dataframes:
         logger.info(f"Uploading {len(dataframes)} processed dataframes to Glue")
-        success = upload_to_glue(dataframes, mode=mode)
-        
+
+        # Download existing data for affected partitions (if using overwrite_partitions mode)
+        existing_df = None
+        if mode == "overwrite_partitions" and partitions:
+            logger.info(f"Affected partitions: {partitions}")
+            existing_df = download_existing_glue_data(list(partitions))
+
+        success = upload_to_glue(dataframes, existing_df=existing_df, mode=mode)
+
         # Mark files as processed if upload was successful
         if success:
             for s3_key in s3_keys:

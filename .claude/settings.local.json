@@ -12,7 +12,8 @@
       "Bash(git fetch:*)",
       "Bash(source:*)",
       "Bash(AWS_PROFILE=personal PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper python3:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
