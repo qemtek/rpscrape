@@ -2,6 +2,8 @@ import gzip
 import requests
 import os
 import sys
+import json
+from datetime import datetime, timezone
 
 from dataclasses import dataclass
 
@@ -79,6 +81,26 @@ def get_race_urls(tracks, years, code):
     return sorted(list(urls))
 
 
+def parse_race_details_from_url(url):
+    """
+    Extract race details from URL.
+    Example: https://www.racingpost.com/results/11/cheltenham/2025-11-15/905542
+    Returns: {'course_id': '11', 'course': 'cheltenham', 'date': '2025-11-15', 'race_id': '905542'}
+    """
+    try:
+        parts = url.replace('https://www.racingpost.com/results/', '').split('/')
+        if len(parts) >= 4:
+            return {
+                'course_id': parts[0],
+                'course': parts[1],
+                'date': parts[2],
+                'race_id': parts[3]
+            }
+    except:
+        pass
+    return {'course_id': '', 'course': '', 'date': '', 'race_id': ''}
+
+
 def get_race_urls_date(dates, region):
     urls = set()
 
@@ -106,10 +128,16 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
         os.makedirs(out_dir)
 
     file_path = f'{out_dir}/{file_name}.{file_extension}'
-    failure_log_path = f'{out_dir}/{file_name}_failures.log'
+    failure_log_path = f'{out_dir}/{file_name}_failures.json'
+    metadata_path = f'{out_dir}/{file_name}_metadata.json'
 
-    # Track failures for logging
+    # Track failures and successes for metadata
     failed_races = []
+    successful_races = 0
+    void_races = 0
+    total_races = len(races)
+
+    scrape_timestamp = datetime.now(timezone.utc).isoformat()
 
     with file_writer(file_path) as csv:
         csv.write(settings.csv_header + '\n')
@@ -117,6 +145,7 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
         for url in races:
             max_retries = 3
             retry_delay = 2  # seconds
+            race_details = parse_race_details_from_url(url)
 
             for attempt in range(max_retries):
                 try:
@@ -130,7 +159,18 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                             continue
                         else:
                             logging.error(f'HTTP {r.status_code} for {url} after {max_retries} attempts')
-                            failed_races.append({'url': url, 'reason': f'HTTP {r.status_code}', 'attempts': max_retries})
+                            failed_races.append({
+                                'race_id': race_details.get('race_id', ''),
+                                'course': race_details.get('course', ''),
+                                'course_id': race_details.get('course_id', ''),
+                                'date': race_details.get('date', ''),
+                                'country': code,
+                                'url': url,
+                                'error_type': f'HTTP_{r.status_code}',
+                                'error_message': f'HTTP {r.status_code}',
+                                'attempts': max_retries,
+                                'timestamp': datetime.now(timezone.utc).isoformat()
+                            })
                             break
 
                     doc = html.fromstring(r.content)
@@ -139,10 +179,12 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                     # Success - write data and break retry loop
                     for row in race.csv_data:
                         csv.write(row + '\n')
+                    successful_races += 1
                     break
 
                 except VoidRaceError:
                     # Void races are expected - don't retry
+                    void_races += 1
                     break
 
                 except RaceParseError as e:
@@ -154,7 +196,18 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                         continue
                     else:
                         logging.error(f'Failed to parse {url} after {max_retries} attempts: {str(e)}')
-                        failed_races.append({'url': url, 'reason': 'Parse error (likely HTTP 406)', 'attempts': max_retries})
+                        failed_races.append({
+                            'race_id': race_details.get('race_id', ''),
+                            'course': race_details.get('course', ''),
+                            'course_id': race_details.get('course_id', ''),
+                            'date': race_details.get('date', ''),
+                            'country': code,
+                            'url': url,
+                            'error_type': 'HTTP_406',
+                            'error_message': f'Parse error (likely HTTP 406): {str(e)}',
+                            'attempts': max_retries,
+                            'timestamp': datetime.now(timezone.utc).isoformat()
+                        })
                         break
 
                 except Exception as e:
@@ -165,27 +218,60 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                         continue
                     else:
                         logging.error(f'Unexpected error for {url} after {max_retries} attempts: {str(e)}')
-                        failed_races.append({'url': url, 'reason': f'Unexpected: {str(e)}', 'attempts': max_retries})
+                        failed_races.append({
+                            'race_id': race_details.get('race_id', ''),
+                            'course': race_details.get('course', ''),
+                            'course_id': race_details.get('course_id', ''),
+                            'date': race_details.get('date', ''),
+                            'country': code,
+                            'url': url,
+                            'error_type': 'EXCEPTION',
+                            'error_message': f'Unexpected: {str(e)}',
+                            'attempts': max_retries,
+                            'timestamp': datetime.now(timezone.utc).isoformat()
+                        })
                         break
 
             # Rate limiting: delay between each race request to avoid HTTP 406 errors
             time.sleep(1)
 
-    # Write failure log if there were any failures
+    # Create metadata about this scrape
+    metadata = {
+        'scrape_timestamp': scrape_timestamp,
+        'file_name': file_name,
+        'country': code,
+        'total_races_discovered': total_races,
+        'successful_races': successful_races,
+        'void_races': void_races,
+        'failed_races': len(failed_races),
+        'completeness_pct': round((successful_races / total_races * 100) if total_races > 0 else 0, 2)
+    }
+
+    # Save metadata
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    # Write failure log as JSON if there were any failures
     if failed_races:
         with open(failure_log_path, 'w') as f:
-            f.write(f'Failed to scrape {len(failed_races)} races:\n\n')
-            for failure in failed_races:
-                f.write(f"URL: {failure['url']}\n")
-                f.write(f"Reason: {failure['reason']}\n")
-                f.write(f"Attempts: {failure['attempts']}\n\n")
+            json.dump({
+                'scrape_timestamp': scrape_timestamp,
+                'total_failures': len(failed_races),
+                'failures': failed_races
+            }, f, indent=2)
         print(f'WARNING: {len(failed_races)} races failed to scrape. See {failure_log_path}')
 
     print(f'Finished scraping.\n{file_name}.{file_extension} saved in rpscrape/{out_dir.lstrip("../")}')
+    print(f'Metadata: {successful_races}/{total_races} races scraped successfully ({metadata["completeness_pct"]}%)')
+    if void_races > 0:
+        print(f'Void races: {void_races}')
     if failed_races:
         print(f'Failed races: {len(failed_races)}')
-        return failed_races
-    return []
+
+    return {
+        'metadata': metadata,
+        'failures': failed_races
+    }
 
 
 def writer_csv(file_path):

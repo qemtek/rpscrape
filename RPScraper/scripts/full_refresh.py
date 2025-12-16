@@ -5,8 +5,10 @@ import subprocess
 import awswrangler as wr
 import pandas as pd
 import os
+import json
 from pathlib import Path
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from settings import PROJECT_DIR, boto3_session, S3_BUCKET
 
@@ -55,10 +57,10 @@ def upload_to_s3(local_path, country):
     """Upload file to S3"""
     if not os.path.exists(local_path):
         return
-        
+
     s3_key = f"data/dates/{country}/{os.path.basename(local_path)}"
     s3_path = f"s3://{S3_BUCKET}/{s3_key}"
-    
+
     try:
         df = pd.read_csv(local_path)
         df['created_at'] = pd.Timestamp.now()
@@ -66,6 +68,57 @@ def upload_to_s3(local_path, country):
         print(f"Uploaded {local_path} to {s3_path}")
     except Exception as e:
         print(f"Error uploading {local_path} to S3: {str(e)}")
+
+
+def upload_json_to_s3(local_path, s3_key):
+    """Upload JSON file to S3"""
+    if not os.path.exists(local_path):
+        print(f"Local file not found: {local_path}")
+        return False
+
+    s3_path = f"s3://{S3_BUCKET}/{s3_key}"
+
+    try:
+        with open(local_path, 'r') as f:
+            data = json.load(f)
+
+        # Upload as JSON to S3
+        s3_client = boto3_session.client('s3')
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_key,
+            Body=json.dumps(data, indent=2),
+            ContentType='application/json'
+        )
+        print(f"Uploaded {local_path} to {s3_path}")
+        return True
+    except Exception as e:
+        print(f"Error uploading {local_path} to S3: {str(e)}")
+        return False
+
+
+def upload_scrape_logs(country, date_str):
+    """Upload failure logs and metadata to S3 for a specific scrape"""
+    # Paths for local files
+    filename = date_str.replace('/', '_')
+    base_path = f"{PROJECT_DIR}/data/dates/{country}"
+
+    failure_log_path = f"{base_path}/{filename}_failures.json"
+    metadata_path = f"{base_path}/{filename}_metadata.json"
+
+    # S3 paths - organized by country and date
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+    date_only = date_str.replace('/', '-')  # Convert to YYYY-MM-DD format
+
+    # Upload failure log if it exists
+    if os.path.exists(failure_log_path):
+        s3_key = f"logs/scrape_failures/{country}/{date_only}/scrape_{timestamp}_failures.json"
+        upload_json_to_s3(failure_log_path, s3_key)
+
+    # Upload metadata
+    if os.path.exists(metadata_path):
+        s3_key = f"logs/scrape_metadata/{country}/{date_only}/scrape_{timestamp}_metadata.json"
+        upload_json_to_s3(metadata_path, s3_key)
 
 
 if __name__ == "__main__":
@@ -106,15 +159,18 @@ if __name__ == "__main__":
                     if i % 100 == 0:  # Only print skip message occasionally to reduce output
                         print(f"File already exists in S3 for {country} - {day}, skipping...")
                     continue
-                    
+
                 # Ensure the directory exists
                 os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-                
+
                 # Run scraper
                 run_rpscrape(country, day)
-                
-                # Upload to S3
+
+                # Upload data CSV to S3
                 upload_to_s3(local_file_path, country)
-                
+
+                # Upload failure logs and metadata to S3
+                upload_scrape_logs(country, day)
+
             except Exception as e:
                 print(f"Couldn't process data for {country} on {day}: {str(e)}")
