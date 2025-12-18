@@ -121,6 +121,65 @@ def get_race_urls_date(dates, region):
     return sorted(list(urls))
 
 
+def is_likely_rate_limited(failed_races):
+    """
+    Detect if failures are likely due to rate limiting based on error patterns.
+
+    Returns True if:
+    - More than 50% of failures are HTTP 406 errors
+    - Failures are clustered in time (all within 2 minutes)
+    """
+    if not failed_races:
+        return False
+
+    # Check if >50% of failures are HTTP 406
+    http_406_count = sum(1 for f in failed_races if f.get('error_type') == 'HTTP_406')
+    if http_406_count / len(failed_races) > 0.5:
+        return True
+
+    # Check if failures are clustered in time (within 2 minutes)
+    if len(failed_races) >= 3:
+        try:
+            timestamps = [datetime.fromisoformat(f['timestamp']) for f in failed_races]
+            timestamps.sort()
+            time_span = (timestamps[-1] - timestamps[0]).total_seconds()
+            if time_span < 120:  # All failures within 2 minutes
+                return True
+        except (KeyError, ValueError):
+            pass
+
+    return False
+
+
+def analyze_error_pattern(failed_races):
+    """
+    Categorize the error pattern to understand failure type.
+
+    Returns one of:
+    - 'none': No failures
+    - 'all_rate_limited': 100% HTTP 406 errors
+    - 'mostly_rate_limited': >80% HTTP 406 errors
+    - 'mixed_with_rate_limiting': 50-80% HTTP 406 errors
+    - 'other_errors': <50% HTTP 406 errors (likely real issues)
+    """
+    if not failed_races:
+        return 'none'
+
+    http_406_count = sum(1 for f in failed_races if f.get('error_type') == 'HTTP_406')
+    total = len(failed_races)
+
+    if http_406_count == 0:
+        return 'other_errors'
+    elif http_406_count == total:
+        return 'all_rate_limited'
+    elif http_406_count / total > 0.8:
+        return 'mostly_rate_limited'
+    elif http_406_count / total >= 0.5:
+        return 'mixed_with_rate_limiting'
+    else:
+        return 'other_errors'
+
+
 def scrape_races(races, folder_name, file_name, file_extension, code, file_writer):
     out_dir = f'data/{folder_name}/{code}'
 
@@ -148,8 +207,10 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
             race_details = parse_race_details_from_url(url)
 
             for attempt in range(max_retries):
+                response = None  # Track response for error logging
                 try:
                     r = requests.get(url, headers=random_header.header())
+                    response = r  # Store for error handling
 
                     # Check for HTTP error status
                     if r.status_code != 200:
@@ -188,14 +249,21 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                     break
 
                 except RaceParseError as e:
-                    # Parse errors (likely HTTP 406) - retry with backoff
+                    # Parse errors - could be HTTP 406 or website structure change
+                    # Check actual HTTP status to distinguish
+                    actual_status = response.status_code if response else 'unknown'
+                    is_406 = (actual_status == 406)
+
                     if attempt < max_retries - 1:
-                        logging.warning(f'Parse error for {url}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
+                        logging.warning(f'Parse error for {url} (HTTP {actual_status}), retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
                         time.sleep(retry_delay)
                         retry_delay *= 2  # Exponential backoff
                         continue
                     else:
-                        logging.error(f'Failed to parse {url} after {max_retries} attempts: {str(e)}')
+                        error_type = f'HTTP_{actual_status}' if is_406 else 'PARSE_ERROR'
+                        error_msg = f'Parse error (HTTP {actual_status}): {str(e)}'
+                        logging.error(f'Failed to parse {url} after {max_retries} attempts (HTTP {actual_status}): {str(e)}')
+
                         failed_races.append({
                             'race_id': race_details.get('race_id', ''),
                             'course': race_details.get('course', ''),
@@ -203,8 +271,9 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                             'date': race_details.get('date', ''),
                             'country': code,
                             'url': url,
-                            'error_type': 'HTTP_406',
-                            'error_message': f'Parse error (likely HTTP 406): {str(e)}',
+                            'error_type': error_type,
+                            'error_message': error_msg,
+                            'http_status': actual_status,
                             'attempts': max_retries,
                             'timestamp': datetime.now(timezone.utc).isoformat()
                         })
@@ -235,6 +304,11 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
             # Rate limiting: delay between each race request to avoid HTTP 406 errors
             time.sleep(1)
 
+    # Analyze rate limiting patterns
+    http_406_count = sum(1 for f in failed_races if f.get('error_type') == 'HTTP_406')
+    rate_limited = is_likely_rate_limited(failed_races)
+    error_pattern = analyze_error_pattern(failed_races)
+
     # Create metadata about this scrape
     metadata = {
         'scrape_timestamp': scrape_timestamp,
@@ -244,7 +318,12 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
         'successful_races': successful_races,
         'void_races': void_races,
         'failed_races': len(failed_races),
-        'completeness_pct': round((successful_races / total_races * 100) if total_races > 0 else 0, 2)
+        'completeness_pct': round((successful_races / total_races * 100) if total_races > 0 else 0, 2),
+
+        # Rate limiting detection
+        'http_406_errors': http_406_count,
+        'likely_rate_limited': rate_limited,
+        'error_pattern': error_pattern
     }
 
     # Save metadata
@@ -267,6 +346,9 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
         print(f'Void races: {void_races}')
     if failed_races:
         print(f'Failed races: {len(failed_races)}')
+        print(f'  - HTTP 406 errors: {http_406_count}')
+        print(f'  - Error pattern: {error_pattern}')
+        print(f'  - Likely rate limited: {rate_limited}')
 
     return {
         'metadata': metadata,
