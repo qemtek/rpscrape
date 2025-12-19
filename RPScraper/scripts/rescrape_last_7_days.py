@@ -167,7 +167,7 @@ def main():
         logger.info(f"Countries: {', '.join(countries)}")
         logger.info("")
         logger.info("Data has been updated in Glue using partition overwrites.")
-        logger.info("No duplicates created. Old partition data was replaced atomically.")
+        logger.info("Merge-before-upload logic ensured no duplicates (see logs above for deduplication details).")
 
     return 0
 
