@@ -3,6 +3,7 @@ import requests
 import os
 import sys
 import json
+import random
 from datetime import datetime, timezone
 
 from dataclasses import dataclass
@@ -233,12 +234,18 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
 
     scrape_timestamp = datetime.now(timezone.utc).isoformat()
 
+    # Exponential backoff tracking for rate limiting
+    consecutive_406_errors = 0
+    base_delay = 1.0  # Base delay between races in seconds
+    current_delay = base_delay
+    max_backoff_delay = 60.0  # Max delay after consecutive 406s
+
     with file_writer(file_path) as csv:
         csv.write(settings.csv_header + '\n')
 
         for url in races:
             max_retries = 3
-            retry_delay = 2  # seconds
+            retry_delay = 2  # seconds for individual retry attempts
             race_details = parse_race_details_from_url(url)
 
             for attempt in range(max_retries):
@@ -258,6 +265,11 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                             continue
                         else:
                             logging.error(f'HTTP {r.status_code} for {url} after {max_retries} attempts')
+
+                            # Track 406 errors for exponential backoff
+                            if r.status_code == 406:
+                                consecutive_406_errors += 1
+
                             failed_races.append({
                                 'race_id': race_details.get('race_id', ''),
                                 'course': race_details.get('course', ''),
@@ -279,6 +291,13 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                     for row in race.csv_data:
                         csv.write(row + '\n')
                     successful_races += 1
+
+                    # Reset backoff on success
+                    if consecutive_406_errors > 0:
+                        logging.info(f'✓ Success after {consecutive_406_errors} consecutive 406 errors, resetting backoff')
+                        consecutive_406_errors = 0
+                        current_delay = base_delay
+
                     break
 
                 except VoidRaceError:
@@ -303,6 +322,10 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                         error_type = f'HTTP_{actual_status}' if is_406 else 'PARSE_ERROR'
                         error_msg = f'Parse error (HTTP {actual_status}): {str(e)}'
                         logging.error(f'Failed to parse {url} after {max_retries} attempts (HTTP {actual_status}): {str(e)}')
+
+                        # Track 406 errors for exponential backoff
+                        if is_406:
+                            consecutive_406_errors += 1
 
                         failed_races.append({
                             'race_id': race_details.get('race_id', ''),
@@ -341,8 +364,20 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                         })
                         break
 
-            # Rate limiting: delay between each race request to avoid HTTP 406 errors
-            time.sleep(1)
+            # Exponential backoff: increase delay after consecutive 406 errors
+            if consecutive_406_errors > 0:
+                # Calculate backoff delay: starts at 5s, doubles each time, caps at max
+                current_delay = min(5 * (2 ** (consecutive_406_errors - 1)), max_backoff_delay)
+
+                # Add randomization (±20%) to avoid patterns
+                jitter = current_delay * 0.2 * (random.random() - 0.5) * 2
+                actual_delay = current_delay + jitter
+
+                logging.warning(f'⏸  Rate limited ({consecutive_406_errors} consecutive 406s), backing off for {actual_delay:.1f}s')
+                time.sleep(actual_delay)
+            else:
+                # Normal delay between races
+                time.sleep(base_delay)
 
     # Analyze rate limiting patterns
     http_406_count = sum(1 for f in failed_races if f.get('error_type') == 'HTTP_406')
