@@ -207,8 +207,9 @@ def upload_to_glue(dataframes, existing_df=None, mode="append"):
             combined_df = new_df
 
         # Ensure created_at is datetime for proper comparison
+        # Use utc=True to handle timezone-aware datetime strings properly
         if 'created_at' in combined_df.columns:
-            combined_df['created_at'] = pd.to_datetime(combined_df['created_at'])
+            combined_df['created_at'] = pd.to_datetime(combined_df['created_at'], utc=True)
 
         # Deduplicate based on race_id and horse_id, keeping the row with latest created_at
         initial_len = len(combined_df)
@@ -227,9 +228,10 @@ def upload_to_glue(dataframes, existing_df=None, mode="append"):
             logger.info(f"Removed {duplicates_removed} duplicate rows (kept latest based on created_at)")
 
         # Convert created_at back to ISO format string for Glue
+        # Remove timezone info to avoid issues with Parquet
         if 'created_at' in combined_df.columns:
             combined_df['created_at'] = combined_df['created_at'].apply(
-                lambda x: x.isoformat() if pd.notna(x) else None
+                lambda x: x.replace(tzinfo=None).isoformat() if pd.notna(x) else None
             )
 
         # Write to Glue table with date partitioning
