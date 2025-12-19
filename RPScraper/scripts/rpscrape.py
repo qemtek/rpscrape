@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from lxml import html
 from orjson import loads
+from curl_cffi import requests as curl_requests
 
 from utils.argparser import ArgParser
 from utils.completer import Completer
@@ -30,6 +31,40 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+# Browser profiles for rotation to avoid detection
+BROWSERS = ['chrome120', 'chrome119', 'chrome116', 'edge101', 'safari15_5']
+
+
+def get_with_browser_rotation(url, attempt=0, timeout=10):
+    """
+    Make HTTP request using curl_cffi with browser impersonation rotation.
+
+    Rotates through different browser profiles to avoid detection.
+    Falls back to requests library if curl_cffi fails.
+
+    Args:
+        url: URL to fetch
+        attempt: Current attempt number (used to select browser)
+        timeout: Request timeout in seconds
+
+    Returns:
+        Response object (curl_cffi.Response or requests.Response)
+    """
+    browser = BROWSERS[attempt % len(BROWSERS)]
+
+    try:
+        response = curl_requests.get(
+            url,
+            impersonate=browser,
+            allow_redirects=True,
+            timeout=timeout
+        )
+        return response
+    except Exception as e:
+        # Fallback to requests library if curl_cffi fails
+        logging.debug(f"curl_cffi failed ({e}), falling back to requests library")
+        return requests.get(url, headers=random_header.header(), timeout=timeout)
 
 
 @dataclass
@@ -209,13 +244,16 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
             for attempt in range(max_retries):
                 response = None  # Track response for error logging
                 try:
-                    r = requests.get(url, headers=random_header.header())
+                    # Use browser rotation to avoid detection
+                    r = get_with_browser_rotation(url, attempt=attempt)
                     response = r  # Store for error handling
 
                     # Check for HTTP error status
                     if r.status_code != 200:
+                        browser_used = BROWSERS[attempt % len(BROWSERS)]
                         if attempt < max_retries - 1:
-                            logging.warning(f'HTTP {r.status_code} for {url}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})')
+                            next_browser = BROWSERS[(attempt + 1) % len(BROWSERS)]
+                            logging.warning(f'HTTP {r.status_code} for {url} (browser: {browser_used}), retrying with {next_browser} in {retry_delay}s (attempt {attempt + 1}/{max_retries})')
                             time.sleep(retry_delay)
                             continue
                         else:
@@ -253,9 +291,11 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                     # Check actual HTTP status to distinguish
                     actual_status = response.status_code if response else 'unknown'
                     is_406 = (actual_status == 406)
+                    browser_used = BROWSERS[attempt % len(BROWSERS)]
 
                     if attempt < max_retries - 1:
-                        logging.warning(f'Parse error for {url} (HTTP {actual_status}), retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
+                        next_browser = BROWSERS[(attempt + 1) % len(BROWSERS)]
+                        logging.warning(f'Parse error for {url} (HTTP {actual_status}, browser: {browser_used}), retrying with {next_browser} in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
                         time.sleep(retry_delay)
                         retry_delay *= 2  # Exponential backoff
                         continue
