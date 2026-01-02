@@ -185,27 +185,47 @@ To scrape a particular course or region, use the -c or -r flags with the course 
 
 You can scrape racecards using racecards.py which saves a file containing a json object of racecard information.
 
-There are only two parameter options, --day N and --days N where N is a number 1-2.
+There are only three parameter options, --day N, --days N where N is a number 1-2, and --region N where N is a region (gb, ire, etc).
 
 ### Examples
 
-Scrape todays racecards.
+Scrape today's racecards.
 
 ```
 ./racecards.py --day 1
 ```
 
-Scrape tomorrows racecards.
+Scrape tomorrow's racecards.
 
 ```
 ./racecards.py --day 2
 ```
 
-Scrape todays and tomorrows racecards.
+Scrape today's and tomorrow's racecards.
 
 ```
 ./racecards.py --days 2
 ```
+
+Scrape today's and tomorrow's racecards by region.
+
+```
+./racecards.py --days 2 --region gb
+```
+
+### Racecard Settings
+
+You can customize which data is included in racecards using the settings file. The scraper uses `settings/user_racecard_settings.toml` if it exists, otherwise falls back to `settings/default_racecard_settings.toml`.
+
+To customize:
+
+1. Copy `default_racecard_settings.toml` to `user_racecard_settings.toml`
+2. Edit the settings to enable/disable field groups and data collection options
+
+The settings file lets you control:
+
+- **Data Collection**: Whether to fetch stats and profiles
+- **Field Groups**: Which groups of runner fields to include (core, basic_info, performance, jockey, trainer, etc.)
 
 You can see the structure of the json and some of the race information below.
 
