@@ -1,31 +1,28 @@
 import gzip
-import requests
 import os
 import sys
 import json
 import random
+import time
+import logging
 from datetime import datetime, timezone
 
 from dataclasses import dataclass
 
 from lxml import html
 from orjson import loads
-from curl_cffi import requests as curl_requests
 
 from utils.argparser import ArgParser
 from utils.completer import Completer
-from utils.header import RandomHeader
+from utils.network import NetworkClient, Persistent406Error
 from utils.race import Race, VoidRaceError, RaceParseError
 from utils.rpscrape_settings import Settings
 from utils.update import Update
-import time
-import logging
 
 from utils.course import course_name, courses
 from utils.lxml_funcs import xpath
 
 settings = Settings()
-random_header = RandomHeader()
 
 # Configure logging
 logging.basicConfig(
@@ -33,39 +30,8 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Browser profiles for rotation to avoid detection
-BROWSERS = ['chrome120', 'chrome119', 'chrome116', 'edge101', 'safari15_5']
-
-
-def get_with_browser_rotation(url, attempt=0, timeout=10):
-    """
-    Make HTTP request using curl_cffi with browser impersonation rotation.
-
-    Rotates through different browser profiles to avoid detection.
-    Falls back to requests library if curl_cffi fails.
-
-    Args:
-        url: URL to fetch
-        attempt: Current attempt number (used to select browser)
-        timeout: Request timeout in seconds
-
-    Returns:
-        Response object (curl_cffi.Response or requests.Response)
-    """
-    browser = BROWSERS[attempt % len(BROWSERS)]
-
-    try:
-        response = curl_requests.get(
-            url,
-            impersonate=browser,
-            allow_redirects=True,
-            timeout=timeout
-        )
-        return response
-    except Exception as e:
-        # Fallback to requests library if curl_cffi fails
-        logging.debug(f"curl_cffi failed ({e}), falling back to requests library")
-        return requests.get(url, headers=random_header.header(), timeout=timeout)
+# Global network client using curl_cffi with browser impersonation
+client = NetworkClient(timeout=14)
 
 
 @dataclass
@@ -104,8 +70,13 @@ def get_race_urls(tracks, years, code):
             race_lists.append(race_list)
 
     for race_list in race_lists:
-        r = requests.get(race_list.url, headers=random_header.header())
-        races = loads(r.text)['data']['principleRaceResults']
+        status, r = client.get(race_list.url)
+        if status != 200:
+            logging.warning(f'Failed to get race list for {race_list.course_name}: HTTP {status}')
+            continue
+
+        data = loads(r.text).get('data', {})
+        races = data.get('principleRaceResults', [])
 
         if races:
             for race in races:
@@ -145,7 +116,11 @@ def get_race_urls_date(dates, region):
     course_ids = {course[0] for course in courses(region)}
 
     for day in days:
-        r = requests.get(day, headers=random_header.header())
+        status, r = client.get(day)
+        if status != 200:
+            logging.warning(f'Failed to get results for {day}: HTTP {status}')
+            continue
+
         doc = html.fromstring(r.content)
 
         races = xpath(doc, 'a', 'link-listCourseNameLink')
@@ -244,125 +219,94 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
         csv.write(settings.csv_header + '\n')
 
         for url in races:
-            max_retries = 3
-            retry_delay = 2  # seconds for individual retry attempts
             race_details = parse_race_details_from_url(url)
 
-            for attempt in range(max_retries):
-                response = None  # Track response for error logging
-                try:
-                    # Use browser rotation to avoid detection
-                    r = get_with_browser_rotation(url, attempt=attempt)
-                    response = r  # Store for error handling
+            try:
+                # NetworkClient handles retries and browser rotation internally
+                # Raises Persistent406Error after all retry attempts fail
+                status, r = client.get(url)
 
-                    # Check for HTTP error status
-                    if r.status_code != 200:
-                        browser_used = BROWSERS[attempt % len(BROWSERS)]
-                        if attempt < max_retries - 1:
-                            next_browser = BROWSERS[(attempt + 1) % len(BROWSERS)]
-                            logging.warning(f'HTTP {r.status_code} for {url} (browser: {browser_used}), retrying with {next_browser} in {retry_delay}s (attempt {attempt + 1}/{max_retries})')
-                            time.sleep(retry_delay)
-                            continue
-                        else:
-                            logging.error(f'HTTP {r.status_code} for {url} after {max_retries} attempts')
+                # Check for HTTP error status (non-406 errors)
+                if status != 200:
+                    logging.error(f'HTTP {status} for {url}')
+                    failed_races.append({
+                        'race_id': race_details.get('race_id', ''),
+                        'course': race_details.get('course', ''),
+                        'course_id': race_details.get('course_id', ''),
+                        'date': race_details.get('date', ''),
+                        'country': code,
+                        'url': url,
+                        'error_type': f'HTTP_{status}',
+                        'error_message': f'HTTP {status}',
+                        'attempts': 7,  # NetworkClient default retries
+                        'timestamp': datetime.now(timezone.utc).isoformat()
+                    })
+                    continue
 
-                            # Track 406 errors for exponential backoff
-                            if r.status_code == 406:
-                                consecutive_406_errors += 1
+                doc = html.fromstring(r.content)
+                race = Race(client, url, doc, code, settings.fields)
 
-                            failed_races.append({
-                                'race_id': race_details.get('race_id', ''),
-                                'course': race_details.get('course', ''),
-                                'course_id': race_details.get('course_id', ''),
-                                'date': race_details.get('date', ''),
-                                'country': code,
-                                'url': url,
-                                'error_type': f'HTTP_{r.status_code}',
-                                'error_message': f'HTTP {r.status_code}',
-                                'attempts': max_retries,
-                                'timestamp': datetime.now(timezone.utc).isoformat()
-                            })
-                            break
+                # Success - write data
+                for row in race.csv_data:
+                    csv.write(row + '\n')
+                successful_races += 1
 
-                    doc = html.fromstring(r.content)
-                    race = Race(url, doc, code, settings.fields)
+                # Reset backoff on success
+                if consecutive_406_errors > 0:
+                    logging.info(f'✓ Success after {consecutive_406_errors} consecutive 406 errors, resetting backoff')
+                    consecutive_406_errors = 0
+                    current_delay = base_delay
 
-                    # Success - write data and break retry loop
-                    for row in race.csv_data:
-                        csv.write(row + '\n')
-                    successful_races += 1
+            except Persistent406Error:
+                # NetworkClient exhausted all retries for 406 errors
+                logging.error(f'Persistent HTTP 406 for {url} after all retry attempts')
+                consecutive_406_errors += 1
+                failed_races.append({
+                    'race_id': race_details.get('race_id', ''),
+                    'course': race_details.get('course', ''),
+                    'course_id': race_details.get('course_id', ''),
+                    'date': race_details.get('date', ''),
+                    'country': code,
+                    'url': url,
+                    'error_type': 'HTTP_406',
+                    'error_message': 'Rate limited (HTTP 406) after all retries',
+                    'attempts': 7,  # NetworkClient default retries
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                })
 
-                    # Reset backoff on success
-                    if consecutive_406_errors > 0:
-                        logging.info(f'✓ Success after {consecutive_406_errors} consecutive 406 errors, resetting backoff')
-                        consecutive_406_errors = 0
-                        current_delay = base_delay
+            except VoidRaceError:
+                # Void races are expected - don't count as failure
+                void_races += 1
 
-                    break
+            except RaceParseError as e:
+                logging.error(f'Parse error for {url}: {str(e)}')
+                failed_races.append({
+                    'race_id': race_details.get('race_id', ''),
+                    'course': race_details.get('course', ''),
+                    'course_id': race_details.get('course_id', ''),
+                    'date': race_details.get('date', ''),
+                    'country': code,
+                    'url': url,
+                    'error_type': 'PARSE_ERROR',
+                    'error_message': f'Parse error: {str(e)}',
+                    'attempts': 1,
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                })
 
-                except VoidRaceError:
-                    # Void races are expected - don't retry
-                    void_races += 1
-                    break
-
-                except RaceParseError as e:
-                    # Parse errors - could be HTTP 406 or website structure change
-                    # Check actual HTTP status to distinguish
-                    actual_status = response.status_code if response else 'unknown'
-                    is_406 = (actual_status == 406)
-                    browser_used = BROWSERS[attempt % len(BROWSERS)]
-
-                    if attempt < max_retries - 1:
-                        next_browser = BROWSERS[(attempt + 1) % len(BROWSERS)]
-                        logging.warning(f'Parse error for {url} (HTTP {actual_status}, browser: {browser_used}), retrying with {next_browser} in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
-                        time.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
-                        continue
-                    else:
-                        error_type = f'HTTP_{actual_status}' if is_406 else 'PARSE_ERROR'
-                        error_msg = f'Parse error (HTTP {actual_status}): {str(e)}'
-                        logging.error(f'Failed to parse {url} after {max_retries} attempts (HTTP {actual_status}): {str(e)}')
-
-                        # Track 406 errors for exponential backoff
-                        if is_406:
-                            consecutive_406_errors += 1
-
-                        failed_races.append({
-                            'race_id': race_details.get('race_id', ''),
-                            'course': race_details.get('course', ''),
-                            'course_id': race_details.get('course_id', ''),
-                            'date': race_details.get('date', ''),
-                            'country': code,
-                            'url': url,
-                            'error_type': error_type,
-                            'error_message': error_msg,
-                            'http_status': actual_status,
-                            'attempts': max_retries,
-                            'timestamp': datetime.now(timezone.utc).isoformat()
-                        })
-                        break
-
-                except Exception as e:
-                    # Unexpected errors - log and retry
-                    if attempt < max_retries - 1:
-                        logging.warning(f'Unexpected error for {url}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries}): {str(e)}')
-                        time.sleep(retry_delay)
-                        continue
-                    else:
-                        logging.error(f'Unexpected error for {url} after {max_retries} attempts: {str(e)}')
-                        failed_races.append({
-                            'race_id': race_details.get('race_id', ''),
-                            'course': race_details.get('course', ''),
-                            'course_id': race_details.get('course_id', ''),
-                            'date': race_details.get('date', ''),
-                            'country': code,
-                            'url': url,
-                            'error_type': 'EXCEPTION',
-                            'error_message': f'Unexpected: {str(e)}',
-                            'attempts': max_retries,
-                            'timestamp': datetime.now(timezone.utc).isoformat()
-                        })
-                        break
+            except Exception as e:
+                logging.error(f'Unexpected error for {url}: {str(e)}')
+                failed_races.append({
+                    'race_id': race_details.get('race_id', ''),
+                    'course': race_details.get('course', ''),
+                    'course_id': race_details.get('course_id', ''),
+                    'date': race_details.get('date', ''),
+                    'country': code,
+                    'url': url,
+                    'error_type': 'EXCEPTION',
+                    'error_message': f'Unexpected: {str(e)}',
+                    'attempts': 1,
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                })
 
             # Exponential backoff: increase delay after consecutive 406 errors
             if consecutive_406_errors > 0:

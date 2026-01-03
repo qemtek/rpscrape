@@ -15,7 +15,11 @@
       "Bash(wc:*)",
       "Bash(git checkout:*)",
       "Bash(AWS_PROFILE=personal PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper START_DATE=2025-11-16 END_DATE=2025-12-15 COUNTRIES=gb,ire,fr FORCE=true python3:*)",
-      "Bash(AWS_PROFILE=personal aws s3:*)"
+      "Bash(AWS_PROFILE=personal aws s3:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(python3:*)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "ask": []
