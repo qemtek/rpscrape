@@ -16,7 +16,7 @@ from utils.date import convert_date
 from utils.going import get_surface
 from utils.lps import get_lps_scale
 from utils.lxml_funcs import find
-from utils.network import Persistent406Error, get_request
+from utils.network import NetworkClient
 from utils.region import get_region
 
 rh = RandomHeader()
@@ -37,9 +37,10 @@ class RaceParseError(Exception):
 class Race:
     def __init__(
         self,
+        client: NetworkClient,
         url: str,
         document: HtmlElement,
-        code: str,
+        race_type: str,
         fields: list[str],
         bsp_map: BSPMap | None = None,
     ):
@@ -53,14 +54,9 @@ class Race:
         date_time_info = self.doc.find('.//main[@data-analytics-race-date-time]')
 
         while date_time_info is None:
-            try:
-                _, response = get_request(self.url)
-            except Persistent406Error as err:
-                print('Failed to get date time info.')
-                print(err)
-                sys.exit(1)
-
+            _, response = client.get(self.url)
             doc = html.fromstring(response.content)
+
             date_time_info = doc.find('.//main[@data-analytics-race-date-time]')
             self.doc = doc
 
@@ -87,14 +83,15 @@ class Race:
         )
         self.race_info.surface = get_surface(self.race_info.going)
         self.race_info.race_name = find(self.doc, 'h2', 'rp-raceTimeCourseName__title', property='class')
-        self.race_info.r_class = find(
+        self.race_info.race_class = find(
             self.doc, 'span', 'rp-raceTimeCourseName_class', property='class'
         ).strip('()')
 
-        if self.race_info.r_class == '':
-            self.race_info.r_class = self.get_race_class()
-
         self.race_info.pattern = self.get_race_pattern()
+
+        if self.race_info.race_class == '':
+            self.race_info.race_class = self.get_race_class()
+
         self.race_info.race_name = clean_race(self.race_info.race_name)
         self.race_info.age_band, self.race_info.rating_band = self.parse_race_bands()
 
@@ -106,7 +103,7 @@ class Race:
             self.race_info.dist_m,
         ) = self.get_race_distances()
 
-        self.race_info.r_type = self.get_race_type(code)
+        self.race_info.race_type = self.get_race_type(race_type)
         self.race_info.ran = self.get_num_runners()
 
         pedigree_info = self.doc.xpath("//tr[@data-test-selector='block-pedigreeInfoFullResults']/td")
@@ -182,7 +179,7 @@ class Race:
                 self.runner_info.btn[i] = '-'
 
     def create_csv_data(self, fields: list[str]) -> list[str]:
-        field_mapping = {'type': 'r_type', 'class': 'r_class', 'or': 'ofr'}
+        field_mapping = {'type': 'race_type', 'class': 'race_class', 'or': 'ofr'}
 
         race_values: list[str] = []
         runner_values: list[list[str]] = []
@@ -281,7 +278,7 @@ class Race:
             winning_time,
             btn_adj,
             self.race_info.going,
-            self.race_info.r_type,
+            self.race_info.race_type,
         )
 
     def get_headgear(self) -> list[str]:
@@ -394,6 +391,9 @@ class Race:
 
         if '(premier handicap)' in self.race_info.race_name:
             return 'Class 2'
+
+        if self.race_info.pattern:
+            return 'Class 1'
 
         return ''
 

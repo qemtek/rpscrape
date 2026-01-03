@@ -15,6 +15,9 @@ RPScraper/scripts/ran_error.html
 
 
 racecards/
+
+.env
+
 .idea/
 .vscode/
 __*/
