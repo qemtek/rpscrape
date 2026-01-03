@@ -16,14 +16,13 @@ from datetime import datetime, timedelta
 import csv
 import logging
 from typing import List, Set, Dict
-import requests
 from lxml import html as lxml_html
 from orjson import loads
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from utils.header import RandomHeader
+from utils.network import NetworkClient
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +30,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-random_header = RandomHeader()
+# Global network client using curl_cffi with browser impersonation
+client = NetworkClient(timeout=14)
 
 
 def get_expected_races_for_date(date_str: str, country: str = 'gb') -> Set[str]:
