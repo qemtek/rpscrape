@@ -5,22 +5,19 @@ import sys
 sys.path.insert(0, 'scripts')
 
 from lxml import html
-import requests
+from utils.network import NetworkClient
+
+client = NetworkClient(timeout=14)
 
 url = 'https://www.racingpost.com/results/1353/newcastle-aw/2025-11-17/906635'
 
 print(f"Fetching {url}...")
 
-# Use the same headers as the scraper
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-}
-
 try:
-    response = requests.get(url, headers=headers, timeout=10)
-    print(f"Status code: {response.status_code}")
+    status, response = client.get(url)
+    print(f"Status code: {status}")
 
-    if response.status_code == 200:
+    if status == 200:
         doc = html.fromstring(response.content)
 
         # Try the xpath that's failing
@@ -52,7 +49,7 @@ try:
             print(f"  - {elem.text_content()[:100]}")
 
     else:
-        print(f"Failed to fetch page: {response.status_code}")
+        print(f"Failed to fetch page: {status}")
         print(response.text[:500])
 
 except Exception as e:

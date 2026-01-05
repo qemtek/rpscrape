@@ -5,11 +5,10 @@ import sys
 sys.path.insert(0, 'scripts')
 
 from lxml import html
-import requests
 from utils.race import Race, VoidRaceError
-from utils.header import RandomHeader
+from utils.network import NetworkClient
 
-random_header = RandomHeader()
+client = NetworkClient(timeout=14)
 
 # Problematic URLs from the error
 urls = [
@@ -27,10 +26,10 @@ for url in urls:
 
     try:
         # Fetch the page the same way the scraper does
-        r = requests.get(url, headers=random_header.header())
+        status, r = client.get(url)
         doc = html.fromstring(r.content)
 
-        print(f"Status: {r.status_code}")
+        print(f"Status: {status}")
         print(f"Content length: {len(r.content)} bytes")
 
         # Test the xpath before creating Race object
@@ -44,7 +43,7 @@ for url in urls:
         # Now try to create the Race object
         print("\nCreating Race object...")
         code = 'flat'  # Assuming flat racing
-        race = Race(url, doc, code, settings.fields)
+        race = Race(client, url, doc, code, settings.fields)
         print("✓ Race object created successfully")
         print(f"  Race ID: {race.race_info.get('race_id')}")
         print(f"  Course: {race.race_info.get('course')}")

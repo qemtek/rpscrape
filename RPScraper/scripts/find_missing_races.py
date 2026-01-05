@@ -64,10 +64,10 @@ def get_expected_races_for_date(date_str: str, country: str = 'gb') -> Set[str]:
     logger.info(f'Fetching race schedule for {date_str} from {url}')
 
     try:
-        r = requests.get(url, headers=random_header.header(), timeout=10)
+        status, r = client.get(url)
 
-        if r.status_code != 200:
-            logger.error(f'HTTP {r.status_code} when fetching {url}')
+        if status != 200:
+            logger.error(f'HTTP {status} when fetching {url}')
             return set()
 
         # Parse the JSON data containing race results

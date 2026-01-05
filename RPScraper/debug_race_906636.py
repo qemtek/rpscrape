@@ -5,10 +5,9 @@ import sys
 sys.path.insert(0, 'scripts')
 
 from lxml import html
-import requests
-from utils.header import RandomHeader
+from utils.network import NetworkClient
 
-random_header = RandomHeader()
+client = NetworkClient(timeout=14)
 
 url = 'https://www.racingpost.com/results/1353/newcastle-aw/2025-11-17/906636'
 
@@ -20,10 +19,10 @@ for i in range(5):
     print(f"Request {i+1}/5")
     print('='*80)
 
-    r = requests.get(url, headers=random_header.header())
+    status, r = client.get(url)
     doc = html.fromstring(r.content)
 
-    print(f"Status: {r.status_code}")
+    print(f"Status: {status}")
     print(f"Content length: {len(r.content)} bytes")
 
     # Test the problematic xpath
