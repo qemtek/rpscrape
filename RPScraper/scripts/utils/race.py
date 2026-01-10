@@ -18,6 +18,8 @@ from utils.lxml_funcs import find
 from utils.network import NetworkClient
 from utils.region import get_region
 
+
+
 regex_class = r'(\(|\s)(C|c)lass (\d|[A-Ha-h])(\)|\s)'
 regex_group = r'(\(|\s)((G|g)rade|(G|g)roup) (\d|[A-Ca-c]|I*)(\)|\s)'
 
