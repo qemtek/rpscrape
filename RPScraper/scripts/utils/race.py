@@ -488,6 +488,8 @@ class Race:
                 sexs.append(text_parts[0].upper())
             elif len(text_parts) == 2:
                 sexs.append(text_parts[1].upper())
+            elif len(text_parts) == 0:
+                sexs.append('')
             else:
                 raise ValueError(
                     f'Unexpected sex format: {text_parts} (URL: {getattr(self, "url", "unknown")})'
