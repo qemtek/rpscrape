@@ -60,11 +60,11 @@ class Pedigree:
         index: int,
         transform: Callable[[HtmlElement], str],
     ) -> None:
-        if len(ped_info) > index:
+        try:
             element = ped_info[index]
             collection.append(transform(element))
             id_collection.append(element.attrib.get('href', '').split('/')[3])
-        else:
+        except IndexError:
             collection.append('')
             id_collection.append('')
 
