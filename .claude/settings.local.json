@@ -19,7 +19,15 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(python3:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(export AWS_PROFILE=personal)",
+      "Bash(export PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper:/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper/scripts:*)",
+      "Bash(curl:*)",
+      "Bash(if [ -f /tmp/gb_race.html ])",
+      "Bash(then grep -A 2 \"data-test-selector=''link-jockeyName''\" /tmp/gb_race.html)",
+      "Bash(fi)",
+      "Skill(commit-commands:commit)",
+      "Bash(git rev-list:*)"
     ],
     "deny": [],
     "ask": []

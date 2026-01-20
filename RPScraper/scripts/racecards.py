@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import tomli
+import pytz
 
 from collections import defaultdict
 from dotenv import load_dotenv
@@ -510,8 +511,11 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Use UK time for "today" since Racing Post is UK-based
+    uk_tz = pytz.timezone('Europe/London')
+    uk_today = datetime.datetime.now(uk_tz).date()
     dates: list[str] = [
-        (datetime.date.today() + datetime.timedelta(days=i)).isoformat() for i in range(MAX_DAYS)
+        (uk_today + datetime.timedelta(days=i)).isoformat() for i in range(MAX_DAYS)
     ]
 
     if args.day:
