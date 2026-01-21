@@ -436,9 +436,11 @@ def scrape_racecards(
 
         race.href = url_racecard
         race.race_id = int(race_id)
-        race.date = date
 
-        race.off_time = datetime.datetime.fromisoformat(race_meta['raceDatetime']).strftime('%H:%M')
+        # Extract actual race date from raceDatetime, not the requested date
+        race_datetime = datetime.datetime.fromisoformat(race_meta['raceDatetime'])
+        race.date = race_datetime.strftime('%Y-%m-%d')
+        race.off_time = race_datetime.strftime('%H:%M')
 
         race.course_id = race_meta['courseUid']
         race.course = find(doc, 'h1', 'RC-courseHeader__name')
