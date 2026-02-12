@@ -244,7 +244,7 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                     continue
 
                 doc = html.fromstring(r.content)
-                race = Race(client, url, doc, code, settings.fields)
+                race = Race(client, url, doc, settings.fields)
 
                 # Success - write data
                 for row in race.csv_data:
