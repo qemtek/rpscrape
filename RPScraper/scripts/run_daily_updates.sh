@@ -5,7 +5,7 @@ export PYTHONPATH=/app/RPScraper:/app/RPScraper/scripts
 
 # Configuration
 DAYS_TO_REGENERATE=${DAYS_TO_REGENERATE:-7}  # Default to 7 days, can be overridden by env var
-COUNTRIES=${COUNTRIES:-"gb,ire,fr"}          # Default countries, can be overridden by env var
+COUNTRIES=${COUNTRIES:-"gb,ire,fr,usa,aus"}   # Default countries, can be overridden by env var
 
 echo "=========================================="
 echo "DAILY UPDATE: Regenerate Last ${DAYS_TO_REGENERATE} Days"

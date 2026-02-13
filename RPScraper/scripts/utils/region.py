@@ -1,8 +1,11 @@
+from pathlib import Path
 from orjson import loads
+
+_COURSES_DIR = Path(__file__).resolve().parents[2] / 'courses'
 
 
 def get_region(course_id: str) -> str:
-    courses = loads(open('courses/_courses', 'r').read())
+    courses = loads(open(_COURSES_DIR / '_courses', 'r').read())
     courses.pop('all')
 
     for region, course in courses.items():
@@ -23,7 +26,7 @@ def print_regions():
 
 
 def regions():
-    return loads(open('courses/_regions', 'r').read())
+    return loads(open(_COURSES_DIR / '_regions', 'r').read())
 
 
 def region_search(term: str):

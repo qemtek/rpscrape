@@ -1,9 +1,12 @@
 from collections.abc import Generator
+from pathlib import Path
 from orjson import loads
+
+_COURSES_DIR = Path(__file__).resolve().parents[2] / 'courses'
 
 
 def courses(code: str = 'all') -> Generator[tuple[str, str]]:
-    courses = loads(open('courses/_courses', 'r').read())
+    courses = loads(open(_COURSES_DIR / '_courses', 'r').read())
 
     for id, course in courses[code].items():
         yield id, course

@@ -27,7 +27,10 @@
       "Bash(then grep -A 2 \"data-test-selector=''link-jockeyName''\" /tmp/gb_race.html)",
       "Bash(fi)",
       "Skill(commit-commands:commit)",
-      "Bash(git rev-list:*)"
+      "Bash(git rev-list:*)",
+      "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper START_DATE=2026-01-04 END_DATE=2026-02-03 COUNTRIES=gb,ire,fr FORCE=true python3 RPScraper/scripts/full_refresh.py)",
+      "Bash(PYTHONPATH=/Users/christophercollins/Documents/GitHub/rpscrape/RPScraper AWS_PROFILE=personal START_DATE=2026-01-04 END_DATE=2026-02-03 COUNTRIES=gb,ire,fr FORCE=true python3 RPScraper/scripts/full_refresh.py)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": []

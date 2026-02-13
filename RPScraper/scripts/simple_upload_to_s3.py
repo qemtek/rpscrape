@@ -276,7 +276,11 @@ def mark_file_processed(file_path):
 
 def process_all_data(mode="append"):
     """Process all data files in the data/dates directory and upload to S3 and Glue"""
-    countries = ['gb', 'ire', 'fr']  # Add any other countries you want to process
+    countries_env = os.getenv('COUNTRIES', '')
+    if countries_env:
+        countries = [c.strip() for c in countries_env.split(',')]
+    else:
+        countries = ['gb', 'ire', 'fr']
 
     logger.info(f"Processing all data files with mode={mode}")
 

@@ -129,9 +129,9 @@ def main():
         return
     
     # Set fixed parameters
-    start_date = parse_date('2008-05-28')
+    start_date = parse_date('2008-01-01')
     end_date = dt.date.today()
-    countries = ['gb', 'ire', 'fr']
+    countries = ['aus']
     
     print(f"Generating tasks from {start_date} to {end_date}")
     print(f"Countries: {', '.join(countries)}")
