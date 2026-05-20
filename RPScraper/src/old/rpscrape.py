@@ -2,6 +2,7 @@
 
 import gzip
 import os
+import shutil
 import sys
 
 from collections.abc import Callable
@@ -43,8 +44,28 @@ def check_for_update() -> bool:
         return False
 
     success = update.pull_latest()
-    print('Updated successfully.' if success else 'Failed to update.')
+
+    if success:
+        cache_root = Path(__file__).resolve().parents[1] / '.cache'
+
+        if cache_root.exists():
+            shutil.rmtree(cache_root)
+        print('Updated successfully.')
+    else:
+        print('Failed to update.')
+
     return success
+
+
+def clear_request(paths: Paths) -> None:
+    for p in (
+        paths.urls,
+        paths.betfair,
+        paths.progress,
+        paths.output,
+    ):
+        if p.exists():
+            p.unlink()
 
 
 def sort_key(url: str) -> tuple[str, str]:
@@ -108,11 +129,15 @@ def get_race_urls_date(
     return sorted(urls, key=sort_key)
 
 
-def load_or_save_urls(path: Path, builder: Callable[[], list[str]]) -> list[str]:
+def load_or_save_urls(
+    path: Path,
+    builder: Callable[[], list[str]],
+) -> list[str]:
     if path.exists():
         return [line.strip() for line in path.read_text().splitlines() if line.strip()]
 
     urls = builder()
+    path.parent.mkdir(parents=True, exist_ok=True)
     _ = path.write_text('\n'.join(urls))
 
     return urls
@@ -125,19 +150,17 @@ def prepare_betfair(
     if not settings.toml or not settings.toml.get('betfair_data', False):
         return None
 
-    paths.betfair.parent.mkdir(parents=True, exist_ok=True)
-
     from utils.betfair import Betfair
-
-    print('Getting Betfair data...')
 
     if paths.betfair.exists():
         print('Using cached Betfair data')
         return Betfair.from_csv(paths.betfair)
 
+    print('Fetching Betfair data...')
+
     betfair = Betfair(race_urls)
 
-    with open(str(paths.betfair), 'w') as f:
+    with open(paths.betfair, 'w') as f:
         fields = settings.toml.get('fields', {}).get('betfair', {})
         header = ','.join(['date', 'region', 'off', 'horse'] + list(fields.keys()))
         _ = f.write(header + '\n')
@@ -186,9 +209,9 @@ def scrape_races(
 
             try:
                 race = (
-                    Race(client, url, doc, race_type, settings.fields, betfair.data)
+                    Race(client, url, doc, settings.fields, betfair.data)
                     if betfair
-                    else Race(client, url, doc, race_type, settings.fields)
+                    else Race(client, url, doc, settings.fields)
                 )
             except VoidRaceError:
                 continue
@@ -233,6 +256,9 @@ def main():
 
     args = parser.parse(sys.argv[1:])
     paths = build_paths(args.request, gzip_output)
+
+    if args.clean:
+        clear_request(paths)
 
     client = NetworkClient(
         email=os.getenv('EMAIL'),

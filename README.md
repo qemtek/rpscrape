@@ -10,6 +10,7 @@ The aim of this tool is to provide a way of gathering large amounts of historica
 - [Scrape Racecards](#scrape-racecards)
 - [Settings](#settings)
 - [Authentication](#authentication)
+- [Tip Jar](#tip-jar)
 
 ### Requirements
 
@@ -38,16 +39,18 @@ git clone https://github.com/joenano/rpscrape.git
 #### Command-Line Options
 
 ```
--d, --date	Single date or date range YYYY/MM/DD-YYYY/MM/DD.
--y, --year	Year or year range (YYYY or YYYY-YYYY).
--r, --region	Region code (e.g., gb, ire).
--c, --course	Numeric course code.
--t, --type	Race type: flat or jumps.
+-d, --date      Single date or date range YYYY/MM/DD-YYYY/MM/DD.
+-y, --year      Year or year range (YYYY or YYYY-YYYY).
+-r, --region    Region code (e.g., gb, ire).
+-c, --course    Numeric course code.
+-t, --type      Race type: flat or jumps.
 
---date-file	File containing dates (one per line, YYYY/MM/DD).
+--date-file     File containing dates (one per line, YYYY/MM/DD).
 
---regions	List or search regions.
---courses	List/search courses or list courses in a region.
+--clean         Clear cache and data before running request.
+
+--regions       List or search regions.
+--courses       List/search courses or list courses in a region.
 ```
 
 ##### Notes
@@ -206,3 +209,39 @@ There will be multiple keys beginning with `CognitoIdentityServiceProvider`, you
 
 ![alt text](https://i.postimg.cc/FK41xJ3W/20260103-113009.png)
 ![alt text](https://i.postimg.cc/nLJM1QBg/20260103-113046.png)
+
+## Tip Jar
+
+This project has been maintained for years at no cost, and will continue to be, but if you found it valuable and would like to tip me, you can send to any of the following addresses.
+
+---
+
+#### Nano (XNO)
+
+`nano_1cigm8i1hnhqhd7scd1hdfya8xxm7b7u8ar5zu5dtyhf5aedinmx3w3ghhfa`
+
+---
+
+#### Monero (XMR)
+
+`86pjtDW83SDTE2AoQFxSBJPhT5H8WcSRkJUf74TcDzTLPZhJeeha9ZD2SStTxkdqWtTXr4hbKopx3GguYsKRywrUBavJ7Je`
+
+---
+
+#### Bitcoin (BTC)
+
+`bc1q7ad36qq9zmw77h4dhl0q44hddlutfygz5z4sa3`
+
+---
+
+#### Solana (SOL)
+
+`5zqqKsgC6ZF18cySJjaULxREPLzNFnuHrMfGohvuvFHb`
+
+---
+
+#### Ethereum (ETH)
+
+`0x73b7207FDf50E4f6Fb444597f9C33be7E2baA0CE`
+
+---

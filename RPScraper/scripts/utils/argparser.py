@@ -3,11 +3,12 @@ import sys
 
 from datetime import date, datetime
 from argparse import ArgumentParser
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 from utils.region import print_regions, valid_region, region_search
-from utils.date import check_date, get_dates, parse_years, valid_years
+from utils.date import check_date, format_date, get_dates, parse_years, valid_years
 from utils.course import course_name, course_search, courses, print_courses, valid_course
+from utils.paths import RequestKey
 
 # Type alias compatible with Python 3.9+
 ArgDict = Union[
@@ -66,6 +67,23 @@ ERROR = {
 }
 
 
+class ParsedRequest(NamedTuple):
+    request: RequestKey
+    dates: list[date]
+    years: list[str]
+    tracks: list[tuple[str, str]]
+    race_type: str
+    clean: bool
+
+
+class ParsedArgs(NamedTuple):
+    dates: list[date]
+    tracks: list[tuple[str, str]]
+    years: list[str]
+    region: str
+    race_type: str
+
+
 class ArgParser:
     def __init__(self):
         self.dates: list[date] = []
@@ -80,6 +98,135 @@ class ArgParser:
         _ = self.parser.add_argument('-r', '--region', metavar='', type=str, help=INFO['region'])
         _ = self.parser.add_argument('-y', '--year', metavar='', type=str, help=INFO['year'])
         _ = self.parser.add_argument('-t', '--type', metavar='', type=str, help=INFO['type'])
+        _ = self.parser.add_argument(
+            '--date-file',
+            metavar='PATH',
+            help='File containing dates, one per line (YYYY/MM/DD)',
+        )
+        _ = self.parser.add_argument(
+            '--clean',
+            action='store_true',
+            help='Fully reset this request (clear cache and output) before running',
+        )
+        _ = self.parser.add_argument(
+            '--regions',
+            nargs='?',
+            const='',
+            metavar='QUERY',
+            help='List regions or search regions',
+        )
+        _ = self.parser.add_argument(
+            '--courses',
+            nargs='?',
+            const='',
+            metavar='QUERY|REGION',
+            help='List courses, search courses, or list courses in region',
+        )
+
+    def parse(self, argv: list[str]) -> ParsedRequest:
+        args = self.parser.parse_args(argv)
+
+        if args.regions is not None:
+            print_regions() if args.regions == '' else region_search(args.regions)
+            raise SystemExit(0)
+
+        if args.courses is not None:
+            if args.courses == '':
+                print_courses()
+            elif valid_region(args.courses):
+                print_courses(args.courses)
+            else:
+                course_search(args.courses)
+            raise SystemExit(0)
+
+        if args.region and args.course:
+            self.parser.error('Choose either --region or --course, not both')
+
+        if args.course:
+            if not valid_course(args.course):
+                self.parser.error('Invalid course code')
+
+            name = course_name(args.course)
+            if not name:
+                self.parser.error('Unknown course')
+
+            scope_kind = 'course'
+            scope_value = args.course
+            tracks = [(args.course, name)]
+        else:
+            region = args.region or 'all'
+            if args.region and not valid_region(args.region):
+                self.parser.error('Invalid region code')
+
+            scope_kind = 'region'
+            scope_value = region
+            tracks = list(courses(region))
+
+        race_type = args.type or 'all'
+
+        dates: list[date] = []
+        years: list[str] = []
+
+        if args.date_file:
+            if args.date or args.year:
+                self.parser.error('--date-file cannot be used with --date or --year')
+
+            try:
+                with open(args.date_file, 'r', encoding='utf-8') as f:
+                    raw_dates = [line.strip() for line in f if line.strip()]
+            except OSError as e:
+                self.parser.error(f'Unable to read dates file: {e}')
+
+            for d in raw_dates:
+                d = d.replace('-', '/')
+                if not check_date(d):
+                    self.parser.error(f'Invalid date in file: {d}')
+                dates.extend(get_dates(d))
+
+        elif args.date:
+            if args.year:
+                self.parser.error('--date and --year are incompatible')
+
+            if not check_date(args.date):
+                self.parser.error('Invalid date format')
+
+            dates = get_dates(args.date)
+
+        else:
+            if not args.year:
+                self.parser.error('Either --date, --date-file, or --year is required')
+
+            years = parse_years(args.year)
+            if not years or not valid_years(years):
+                self.parser.error('Invalid year or year range')
+
+        if years and not args.type:
+            self.parser.error('--type is required when scraping by year')
+
+        if dates:
+            start = format_date(dates[0])
+            end = format_date(dates[-1])
+        else:
+            start = f'{years[0]}'
+            end = f'{years[-1]}'
+
+        filename = start if start == end else f'{start}_{end}'
+
+        request = RequestKey(
+            scope_kind=scope_kind,
+            scope_value=scope_value,
+            race_type=race_type,
+            filename=filename,
+        )
+
+        return ParsedRequest(
+            request=request,
+            dates=dates,
+            years=years,
+            tracks=tracks,
+            race_type=race_type,
+            clean=args.clean,
+        )
 
     def parse_args(self, arg_list: list[str]):
         args = self.parser.parse_args(args=arg_list)

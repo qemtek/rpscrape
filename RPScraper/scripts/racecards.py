@@ -10,6 +10,7 @@ import pytz
 
 from collections import defaultdict
 from dotenv import load_dotenv
+from functools import partial
 from lxml import etree, html
 from pathlib import Path
 from orjson import dumps
@@ -24,12 +25,10 @@ from utils.network import NetworkClient
 from utils.profiles import get_profiles
 from utils.region import get_region, valid_region
 from utils.stats import Stats
-
 from models.racecard import Racecard, Runner
 
 _ = load_dotenv()
 
-MAX_DAYS = 2
 
 RACE_TYPE = {
     'F': 'Flat',
@@ -55,10 +54,7 @@ def load_field_config() -> dict[str, Any]:
     if not config_path.exists():
         # Return default config (everything enabled)
         return {
-            'data_collection': {
-                'fetch_profiles': False,
-                'fetch_stats': False,
-            },
+            'data_collection': {'fetch_profiles': False, 'fetch_stats': False, 'max_days': 2},
             'field_groups': {},  # Empty means all groups enabled
         }
 
@@ -68,13 +64,13 @@ def load_field_config() -> dict[str, Any]:
     return config
 
 
-def validate_days_range(value: str) -> int:
+def validate_days_range(value: str, max_days: int) -> int:
     try:
         days = int(value)
-        if 1 <= days <= MAX_DAYS:
+        if 1 <= days <= max_days:
             return days
         raise argparse.ArgumentTypeError(
-            f'Value must be an integer between 1 and {MAX_DAYS}. Got: {days}'
+            f'Value must be an integer between 1 and {max_days}. Got: {days}'
         )
     except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid value: '{value}'. Expected an integer.")
@@ -430,7 +426,7 @@ def scrape_racecards(
         if fetch_profiles:
             profile_hrefs = doc.xpath("//a[@data-test-selector='RC-cardPage-runnerName']/@href")
             profile_urls = [url_base + a.split('#')[0] + '/form' for a in profile_hrefs]
-            profiles = get_profiles(profile_urls)
+            profiles = get_profiles(client, profile_urls)
 
         race: Racecard = Racecard()
 
@@ -484,6 +480,9 @@ def scrape_racecards(
 
 
 def main() -> None:
+    config = load_field_config()
+    max_days = config.get('data_collection', {}).get('max_days', 2)
+
     parser = argparse.ArgumentParser(
         description='Scrape racecards for a single day or a range of days.',
         formatter_class=argparse.RawTextHelpFormatter,
@@ -491,16 +490,19 @@ def main() -> None:
 
     flag_group = parser.add_mutually_exclusive_group()
 
+    validate_with_limit = partial(validate_days_range, max_days=max_days)
+
     _ = flag_group.add_argument(
         '--day',
-        type=validate_days_range,
-        help="Scrape a single specific day (N). E.g., '--day 2' scrapes the 2nd day.",
+        type=validate_with_limit,
+        help='Scrape a single specific day (N).',
         metavar='N',
     )
+
     _ = flag_group.add_argument(
         '--days',
-        type=validate_days_range,
-        help="Scrape a range of days (N total). E.g., '--days 2' scrapes 2 days.",
+        type=validate_with_limit,
+        help='Scrape a range of days (N total).',
         metavar='N',
     )
 
@@ -517,7 +519,7 @@ def main() -> None:
     uk_tz = pytz.timezone('Europe/London')
     uk_today = datetime.datetime.now(uk_tz).date()
     dates: list[str] = [
-        (uk_today + datetime.timedelta(days=i)).isoformat() for i in range(MAX_DAYS)
+        (uk_today + datetime.timedelta(days=i)).isoformat() for i in range(max_days)
     ]
 
     if args.day:
@@ -526,7 +528,7 @@ def main() -> None:
         dates = dates[: args.days]
     else:
         parser.print_usage(sys.stderr)
-        print(f'\nError: Must specify a day (--day) or days (--days) (1-{MAX_DAYS})')
+        print(f'\nError: Must specify a day (--day) or days (--days) (1-{max_days})')
         sys.exit(1)
 
     if not os.path.exists('../racecards'):
@@ -538,15 +540,13 @@ def main() -> None:
         print(f'Invalid region: {args.region}')
         sys.exit(1)
 
-    email = os.getenv('EMAIL')
-    auth_state = os.getenv('AUTH_STATE')
-    access_token = os.getenv('ACCESS_TOKEN')
-
-    client = NetworkClient(email=email, auth_state=auth_state, access_token=access_token)
+    client = NetworkClient(
+        email=os.getenv('EMAIL'),
+        auth_state=os.getenv('AUTH_STATE'),
+        access_token=os.getenv('ACCESS_TOKEN'),
+    )
 
     race_urls = get_race_urls(client, dates, region)
-
-    config = load_field_config()
 
     for date in race_urls:
         racecards = scrape_racecards(race_urls, date, config, client)
