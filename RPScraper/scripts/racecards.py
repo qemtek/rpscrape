@@ -22,6 +22,13 @@ from utils.course import valid_meeting
 from utils.going import get_surface
 from utils.lxml_funcs import find
 from utils.network import NetworkClient
+from utils.next_racecards import (
+    extract_meetings,
+    extract_next_data,
+    extract_race_page,
+    map_next_race,
+    map_next_runner,
+)
 from utils.profiles import get_profiles
 from utils.region import get_region, valid_region
 from utils.stats import Stats
@@ -76,6 +83,44 @@ def validate_days_range(value: str, max_days: int) -> int:
         raise argparse.ArgumentTypeError(f"Invalid value: '{value}'. Expected an integer.")
 
 
+def response_text(response: Any) -> str:
+    text = getattr(response, 'text', None)
+    if text is not None:
+        return text
+    return response.content.decode('utf-8')
+
+
+def extract_next_race_urls(
+    meetings: list[dict[str, Any]], region: str | None = None
+) -> list[tuple[str, str]]:
+    race_urls: list[tuple[str, str]] = []
+
+    for meeting in meetings:
+        course = meeting.get('courseName') or meeting.get('courseStyleName') or ''
+        if not course or meeting.get('isAbandoned', False):
+            continue
+        if not valid_meeting(course.strip().lower()):
+            continue
+
+        for race in meeting.get('races', []):
+            race_id = race.get('raceId')
+            href = race.get('raceUrl') or race.get('url') or ''
+            if not race_id or not href or race.get('isAbandoned', False):
+                continue
+
+            if region:
+                course_match = re.search(r'/racecards/(\d+)/', href)
+                if not course_match:
+                    continue
+                course_id = course_match.group(1)
+                if get_region(course_id) != region.upper():
+                    continue
+
+            race_urls.append((str(race_id), href))
+
+    return race_urls
+
+
 def get_race_urls(
     client: NetworkClient, dates: list[str], region: str | None = None
 ) -> dict[str, list[tuple[str, str]]]:
@@ -88,6 +133,14 @@ def get_race_urls(
         if status != 200 or not response.content:
             print(f'Failed to get racecards for {date} (status: {status})')
             continue
+
+        next_data = extract_next_data(response_text(response))
+        if next_data:
+            meetings = extract_meetings(next_data)
+            next_race_urls = extract_next_race_urls(meetings, region)
+            if next_race_urls:
+                race_urls[date].extend(next_race_urls)
+                continue
 
         doc = html.fromstring(response.content)
 
@@ -362,6 +415,72 @@ def parse_runners(
     return runners
 
 
+NEXT_RUNNER_FIELD_GROUPS = {
+    'core': {'name', 'horse_id', 'number', 'draw'},
+    'basic_info': {'age', 'colour', 'region', 'dob', 'sex_code', 'sex'},
+    'performance': {'form', 'rpr', 'ts', 'ofr', 'last_run'},
+    'jockey': {'jockey', 'jockey_id', 'jockey_allowance', 'claim'},
+    'trainer': {'trainer', 'trainer_id', 'trainer_rtf', 'trainer_location', 'trainer_14_days'},
+    'weight': {'lbs'},
+    'equipment': {
+        'headgear',
+        'headgear_first',
+        'gelding_first_time',
+        'wind_surgery_first',
+        'wind_surgery_second',
+    },
+    'breeding': {
+        'sire',
+        'sire_id',
+        'sire_region',
+        'dam',
+        'dam_id',
+        'dam_region',
+        'damsire',
+        'damsire_id',
+        'damsire_region',
+        'breeder',
+        'breeder_id',
+    },
+    'ownership': {'owner', 'owner_id'},
+    'comments': {'comment', 'spotlight'},
+    'status': {'non_runner', 'reserve'},
+    'silk': {'silk_url', 'silk_path'},
+    'profile': {'profile'},
+    'stats': {'stats'},
+    'history': {'prev_trainers', 'prev_owners'},
+    'medical': {'medical'},
+    'quotes': {'quotes', 'stable_tour'},
+}
+
+
+def parse_next_runners(runners_json: list[dict[str, Any]], config: dict[str, Any]) -> list[Runner]:
+    runners: list[Runner] = []
+    field_groups = config.get('field_groups', {})
+    include_all_groups = not field_groups
+
+    def should_include_group(group: str) -> bool:
+        if include_all_groups:
+            return True
+        if group not in field_groups:
+            raise KeyError(f'Unknown field group: {group}')
+        return field_groups[group] is True
+
+    for runner_json in runners_json:
+        mapped = map_next_runner(runner_json, clean_string)
+        runner = Runner()
+
+        for group, fields in NEXT_RUNNER_FIELD_GROUPS.items():
+            if not should_include_group(group):
+                continue
+            for field_name in fields:
+                setattr(runner, field_name, mapped[field_name])
+
+        runners.append(runner)
+
+    return runners
+
+
 def scrape_racecards(
     race_urls: dict[str, list[tuple[str, str]]],
     date: str,
@@ -381,15 +500,43 @@ def scrape_racecards(
         ncols=91,
     ):
         url_base = 'https://www.racingpost.com'
-        url_racecard = f'{url_base}{href}'
+        if href.startswith('http'):
+            url_racecard = href
+        elif href.startswith('/'):
+            url_racecard = f'{url_base}{href}'
+        else:
+            url_racecard = f'{url_base}/{href}'
         url_runners = f'{url_base}/profile/horse/data/cardrunners/{race_id}.json'
 
         status_racecard, resp_racecard = client.get(url_racecard)
-        status_runners, resp_runners = client.get(url_runners)
 
-        if status_racecard != 200 or status_runners != 200:
+        if status_racecard != 200:
             print('Failed to get racecard data.')
             print(f'status: {status_racecard} url: {url_racecard}')
+            continue
+
+        next_data = extract_next_data(response_text(resp_racecard))
+        if next_data:
+            next_race, next_runners = extract_race_page(next_data)
+            if next_race:
+                race_data = map_next_race(
+                    next_race,
+                    target_date=date,
+                    url=url_racecard,
+                    meeting_country='',
+                    region_lookup=get_region,
+                    surface_lookup=get_surface,
+                )
+                race = Racecard(**race_data)
+                race.runners = parse_next_runners(next_runners or [], config)
+
+                races[race.region][race.course][race.off_time] = race.to_dict()
+                continue
+
+        status_runners, resp_runners = client.get(url_runners)
+
+        if status_runners != 200:
+            print('Failed to get racecard data.')
             print(f'status: {status_runners} url: {url_runners}')
             continue
 
