@@ -2,15 +2,50 @@ import json
 import unittest
 
 from RPScraper.scripts.utils.next_racecards import (
+    RacecardDiscoveryError,
     extract_meetings,
     extract_next_data,
     extract_race_page,
     map_next_race,
     map_next_runner,
+    meeting_course_name,
+    require_race_urls,
 )
 
 
 class NextRacecardTests(unittest.TestCase):
+    def test_meeting_course_name_supports_current_name_field(self):
+        self.assertEqual(meeting_course_name({'name': 'BATH'}), 'BATH')
+
+    def test_meeting_course_name_prefers_legacy_explicit_course_name(self):
+        self.assertEqual(
+            meeting_course_name(
+                {
+                    'courseName': 'Kempton',
+                    'courseStyleName': 'Kempton (AW)',
+                    'name': 'KEMPTON (AW)',
+                }
+            ),
+            'Kempton',
+        )
+
+    def test_empty_race_url_discovery_fails_loudly(self):
+        with self.assertRaisesRegex(RacecardDiscoveryError, '2026-09-02'):
+            require_race_urls({}, ['2026-09-02'])
+
+    def test_race_url_discovery_requires_every_requested_date(self):
+        with self.assertRaisesRegex(RacecardDiscoveryError, '2026-09-03'):
+            require_race_urls(
+                {'2026-09-02': [('123', '/racecards/example/123')]},
+                ['2026-09-02', '2026-09-03'],
+            )
+
+    def test_populated_race_url_discovery_passes(self):
+        require_race_urls(
+            {'2026-09-02': [('123', '/racecards/example/123')]},
+            ['2026-09-02'],
+        )
+
     def test_extracts_next_data_from_script_tag(self):
         payload = {'props': {'pageProps': {'initialState': {'raceCards': {'meetings': []}}}}}
         html = (

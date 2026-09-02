@@ -28,6 +28,8 @@ from utils.next_racecards import (
     extract_race_page,
     map_next_race,
     map_next_runner,
+    meeting_course_name,
+    require_race_urls,
 )
 from utils.profiles import get_profiles
 from utils.region import get_region, valid_region
@@ -96,7 +98,7 @@ def extract_next_race_urls(
     race_urls: list[tuple[str, str]] = []
 
     for meeting in meetings:
-        course = meeting.get('courseName') or meeting.get('courseStyleName') or ''
+        course = meeting_course_name(meeting)
         if not course or meeting.get('isAbandoned', False):
             continue
         if not valid_meeting(course.strip().lower()):
@@ -694,6 +696,7 @@ def main() -> None:
     )
 
     race_urls = get_race_urls(client, dates, region)
+    require_race_urls(race_urls, dates)
 
     for date in race_urls:
         racecards = scrape_racecards(race_urls, date, config, client)

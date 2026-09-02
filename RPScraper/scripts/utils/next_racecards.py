@@ -22,6 +22,33 @@ RACE_TYPE_MAP = {
 DEFAULT_RACE_TYPE = 'Flat'
 
 
+class RacecardDiscoveryError(RuntimeError):
+    """Raised when a requested date yields no discoverable race URLs."""
+
+
+def require_race_urls(
+    race_urls: Dict[str, List[Tuple[str, str]]], target_dates: List[str]
+) -> None:
+    """Fail loudly rather than treating an empty Racing Post page as success."""
+    missing_dates = [date for date in target_dates if not race_urls.get(date)]
+    if missing_dates:
+        joined = ", ".join(missing_dates)
+        raise RacecardDiscoveryError(
+            "Racing Post returned no discoverable race URLs for requested date(s): "
+            f"{joined}. Refusing to exit successfully without a racecard file."
+        )
+
+
+def meeting_course_name(meeting: Dict[str, Any]) -> str:
+    """Return the course label across Racing Post meeting schema versions."""
+    return (
+        meeting.get('courseName')
+        or meeting.get('courseStyleName')
+        or meeting.get('name')
+        or ''
+    )
+
+
 def extract_next_data(page_html: str) -> Optional[Dict[str, Any]]:
     match = re.search(
         r'<script\s+id="__NEXT_DATA__"\s+type="application/json">(.*?)</script>',
