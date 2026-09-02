@@ -26,6 +26,11 @@ class RacecardDiscoveryError(RuntimeError):
     """Raised when a requested date yields no discoverable race URLs."""
 
 
+def racecards_page_url(target_date: str) -> str:
+    """Build the canonical dated URL without triggering Racing Post's bot redirect."""
+    return f'https://www.racingpost.com/racecards/{target_date}/'
+
+
 def require_race_urls(
     race_urls: Dict[str, List[Tuple[str, str]]], target_dates: List[str]
 ) -> None:

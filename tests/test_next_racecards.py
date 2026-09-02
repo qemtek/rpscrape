@@ -9,11 +9,18 @@ from RPScraper.scripts.utils.next_racecards import (
     map_next_race,
     map_next_runner,
     meeting_course_name,
+    racecards_page_url,
     require_race_urls,
 )
 
 
 class NextRacecardTests(unittest.TestCase):
+    def test_dated_racecard_url_uses_canonical_trailing_slash(self):
+        self.assertEqual(
+            racecards_page_url('2026-09-02'),
+            'https://www.racingpost.com/racecards/2026-09-02/',
+        )
+
     def test_meeting_course_name_supports_current_name_field(self):
         self.assertEqual(meeting_course_name({'name': 'BATH'}), 'BATH')
 

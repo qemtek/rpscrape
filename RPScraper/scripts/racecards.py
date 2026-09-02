@@ -29,6 +29,7 @@ from utils.next_racecards import (
     map_next_race,
     map_next_runner,
     meeting_course_name,
+    racecards_page_url,
     require_race_urls,
 )
 from utils.profiles import get_profiles
@@ -129,7 +130,7 @@ def get_race_urls(
     race_urls: defaultdict[str, list[tuple[str, str]]] = defaultdict(list)
 
     for date in dates:
-        url = f'https://www.racingpost.com/racecards/{date}'
+        url = racecards_page_url(date)
         status, response = client.get(url)
 
         if status != 200 or not response.content:
