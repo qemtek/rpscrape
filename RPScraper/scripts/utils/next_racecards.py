@@ -84,7 +84,7 @@ def extract_meetings(data: Dict[str, Any]) -> List[Dict[str, Any]]:
 def extract_race_page(
     data: Dict[str, Any],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
-    container = _initial_state(data).get('racePage', {}).get('data', {})
+    container = _initial_state(data).get('racePage', {}).get('data') or {}
     race = container.get('race')
     runners = container.get('runners')
     if not race:

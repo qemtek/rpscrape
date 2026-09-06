@@ -86,6 +86,19 @@ class NextRacecardTests(unittest.TestCase):
             ({'raceId': 123}, [{'horseName': 'Example'}]),
         )
 
+    def test_null_race_page_data_is_treated_as_missing(self):
+        data = {
+            'props': {
+                'pageProps': {
+                    'initialState': {
+                        'racePage': {'data': None},
+                    }
+                }
+            }
+        }
+
+        self.assertEqual(extract_race_page(data), (None, None))
+
     def test_maps_next_race_to_existing_output_shape(self):
         race = {
             'raceId': 123,
