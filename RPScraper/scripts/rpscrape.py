@@ -139,11 +139,7 @@ def get_race_urls_date(dates, region):
 
             for race in meeting.get('races', []):
                 race_id = race.get('raceId')
-                if (
-                    race.get('currentRaceStatus') != 'result'
-                    or not race_id
-                    or race.get('includeForWebApp') is False
-                ):
+                if race.get('currentRaceStatus') != 'result' or not race_id:
                     continue
 
                 url = (

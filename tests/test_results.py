@@ -55,11 +55,6 @@ class ResultDiscoveryTests(unittest.TestCase):
                             'raceId': '924812',
                             'currentRaceStatus': 'pre-race',
                         },
-                        {
-                            'raceId': '924813',
-                            'currentRaceStatus': 'result',
-                            'includeForWebApp': False,
-                        },
                     ],
                 },
                 {
