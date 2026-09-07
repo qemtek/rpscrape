@@ -20,8 +20,6 @@ from utils.rpscrape_settings import Settings
 from utils.update import Update
 
 from utils.course import course_name, courses
-from utils.lxml_funcs import xpath
-
 settings = Settings()
 
 # Configure logging
@@ -109,27 +107,48 @@ def parse_race_details_from_url(url):
 
 
 def get_race_urls_date(dates, region):
-    urls = set()
-
-    days = [f'https://www.racingpost.com/results/{d}' for d in dates]
-
+    races_by_url = {}
     course_ids = {course[0] for course in courses(region)}
 
-    for day in days:
-        status, r = client.get(day)
+    for date in dates:
+        date_str = str(date)
+        endpoint = f'https://www.racingpost.com/api/racing/meetings?date={date_str}'
+        status, r = client.get(endpoint)
         if status != 200:
-            logging.warning(f'Failed to get results for {day}: HTTP {status}')
-            continue
+            raise RuntimeError(
+                f'Failed to discover results for {date_str}: HTTP {status}'
+            )
 
-        doc = html.fromstring(r.content)
+        try:
+            meetings = loads(r.content)['meetings']
+        except (KeyError, TypeError, ValueError) as e:
+            raise RuntimeError(
+                f'Invalid Racing Post meetings response for {date_str}'
+            ) from e
 
-        races = xpath(doc, 'a', 'link-listCourseNameLink')
+        if not isinstance(meetings, list):
+            raise RuntimeError(
+                f'Invalid Racing Post meetings response for {date_str}'
+            )
 
-        for race in races:
-            if race.attrib['href'].split('/')[2] in course_ids:
-                urls.add('https://www.racingpost.com' + race.attrib['href'])
+        for meeting in meetings:
+            course_id = str(meeting.get('venueUid', ''))
+            course_key = meeting.get('courseKey') or ''
+            if course_id not in course_ids or not course_key:
+                continue
 
-    return sorted(list(urls))
+            for race in meeting.get('races', []):
+                race_id = race.get('raceId')
+                if race.get('currentRaceStatus') != 'result' or not race_id:
+                    continue
+
+                url = (
+                    'https://www.racingpost.com/results/'
+                    f'{course_id}/{course_key}/{date_str}/{race_id}'
+                )
+                races_by_url[url] = race
+
+    return sorted(races_by_url.items())
 
 
 def is_likely_rate_limited(failed_races):
@@ -218,7 +237,13 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
     with file_writer(file_path) as csv:
         csv.write(settings.csv_header + '\n')
 
-        for url in races:
+        for race_source in races:
+            if isinstance(race_source, tuple):
+                url, race_metadata = race_source
+            else:
+                url = race_source
+                race_metadata = None
+
             race_details = parse_race_details_from_url(url)
 
             try:
@@ -244,7 +269,13 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                     continue
 
                 doc = html.fromstring(r.content)
-                race = Race(client, url, doc, settings.fields)
+                race = Race(
+                    client,
+                    url,
+                    doc,
+                    settings.fields,
+                    race_metadata=race_metadata,
+                )
 
                 # Success - write data
                 for row in race.csv_data:

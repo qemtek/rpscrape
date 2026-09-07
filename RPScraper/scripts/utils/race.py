@@ -1,10 +1,9 @@
-import sys
-
 from datetime import datetime
 from jarowinkler import jarowinkler_similarity
-from lxml import html
 from lxml.html import HtmlElement
+from orjson import loads
 from re import search, sub
+from typing import Any
 
 from models.betfair import BSPMap
 from models.race import RaceInfo, RunnerInfo
@@ -16,12 +15,78 @@ from utils.going import get_surface
 from utils.lps import get_lps_scale
 from utils.lxml_funcs import find
 from utils.network import NetworkClient
+from utils.next_racecards import RACE_TYPE_MAP
 from utils.region import get_region
 
 
 
 regex_class = r'(\(|\s)(C|c)lass (\d|[A-Ha-h])(\)|\s)'
 regex_group = r'(\(|\s)((G|g)rade|(G|g)roup) (\d|[A-Ca-c]|I*)(\)|\s)'
+
+
+def _profile_id(url: str | None) -> str:
+    if not url:
+        return ''
+    match = search(r'/profile/[^/]+/(\d+)', url)
+    return match.group(1) if match else ''
+
+
+def _value(value: Any, missing: str = '') -> str:
+    if value is None or value == '–':
+        return missing
+    return str(value)
+
+
+def _with_suffix(name: str | None, suffix: str | None) -> str:
+    if not name:
+        return ''
+    return clean_string(f'{name} {suffix or "(GB)"}')
+
+
+def _owner_name(url: str | None, fallback: str | None) -> str:
+    if url:
+        parts = url.strip('/').split('/')
+        if len(parts) >= 4:
+            return parts[3].replace('-', ' ').title()
+    return clean_string(fallback or '')
+
+
+def _distance_value(value: Any) -> str:
+    if value is None or value == '':
+        return ''
+    return distance_to_decimal(str(value))
+
+
+def _winning_time_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+
+    match = search(r'^(?:(\d+)m\s*)?([\d.]+)s$', value.strip())
+    if not match:
+        return None
+
+    minutes = int(match.group(1) or 0)
+    return round(minutes * 60 + float(match.group(2)), 2)
+
+
+def extract_race_result(document: HtmlElement) -> dict[str, Any] | None:
+    scripts = document.xpath('//script[@id="__NEXT_DATA__"]/text()')
+    if not scripts:
+        return None
+
+    try:
+        data = loads(str(scripts[0]))
+    except (TypeError, ValueError):
+        return None
+
+    result = (
+        data.get('props', {})
+        .get('pageProps', {})
+        .get('initialState', {})
+        .get('raceResult', {})
+        .get('data')
+    )
+    return result if isinstance(result, dict) else None
 
 
 class VoidRaceError(Exception):
@@ -41,22 +106,26 @@ class Race:
         document: HtmlElement,
         fields: list[str],
         bsp_map: BSPMap | None = None,
+        race_metadata: dict[str, Any] | None = None,
     ):
         self.url: str = url
         self.doc: HtmlElement = document
         self.race_info: RaceInfo = RaceInfo()
         self.runner_info: RunnerInfo = RunnerInfo()
 
+        current_result = extract_race_result(self.doc)
+        if current_result is not None:
+            self.load_current_result(current_result, race_metadata or {})
+            if bsp_map:
+                self.join_betfair_data(bsp_map)
+            self.csv_data = self.create_csv_data(fields)
+            return
+
         url_split = self.url.split('/')
 
         date_time_info = self.doc.find('.//main[@data-analytics-race-date-time]')
-
-        while date_time_info is None:
-            _, response = client.get(self.url)
-            doc = html.fromstring(response.content)
-
-            date_time_info = doc.find('.//main[@data-analytics-race-date-time]')
-            self.doc = doc
+        if date_time_info is None:
+            raise RaceParseError(f'No result data found: {self.url}')
 
         self.race_info.course = date_time_info.attrib['data-analytics-coursename']
 
@@ -149,6 +218,225 @@ class Race:
             self.join_betfair_data(bsp_map)
 
         self.csv_data: list[str] = self.create_csv_data(fields)
+
+    def load_current_result(
+        self,
+        result: dict[str, Any],
+        race_metadata: dict[str, Any],
+    ) -> None:
+        header = result.get('header') or {}
+        details = result.get('details') or {}
+        runners = result.get('runners') or []
+
+        if not runners:
+            raise RaceParseError(f'No runners found in result data: {self.url}')
+
+        positions = [_value(runner.get('outcomeCode')) for runner in runners]
+        if positions and positions[0] == 'VOI':
+            raise VoidRaceError(f'VoidRaceError: {self.url}')
+
+        race_datetime = result.get('raceDatetime') or ''
+        course_id = _value(result.get('courseUid'))
+        raw_race_name = _value(header.get('raceTitle'))
+        race_class = _value(header.get('raceClass'))
+        race_type = (
+            RACE_TYPE_MAP.get(_value(header.get('raceTypeCode')))
+            or _value(race_metadata.get('raceType'))
+            or 'Flat'
+        )
+
+        self.race_info.course = clean_string(_value(result.get('courseName')))
+        self.race_info.course_id = course_id
+        self.race_info.date = race_datetime[:10]
+        self.race_info.region = get_region(course_id)
+        self.race_info.race_id = _value(result.get('raceId'))
+        self.race_info.off = parse_time(race_datetime) if race_datetime else ''
+        self.race_info.race_name = raw_race_name
+        self.race_info.pattern = self.get_race_pattern()
+        self.race_info.race_name = clean_race(raw_race_name)
+        self.race_info.race_class = (
+            f'Class {race_class}' if race_class else self.get_race_class()
+        )
+        self.race_info.rating_band = _value(race_metadata.get('ratingBand'))
+        self.race_info.age_band = _value(
+            header.get('agesAllowed') or race_metadata.get('ageRestriction')
+        )
+        self.race_info.sex_rest = self.sex_restricted()
+        self.race_info.race_type = race_type
+
+        distance_yards = header.get('distanceYard')
+        self.race_info.dist = _value(header.get('distanceShort'))
+        self.race_info.dist_y = _value(distance_yards)
+        if distance_yards is not None:
+            furlongs = float(distance_yards) / 220
+            self.race_info.dist_f = f'{furlongs:g}f'
+            self.race_info.dist_m = str(round(float(distance_yards) * 0.9144))
+        else:
+            self.race_info.dist_f = ''
+            self.race_info.dist_m = ''
+        self.race_info.going = _value(header.get('going'))
+        self.race_info.surface = get_surface(self.race_info.going)
+        self.race_info.ran = _value(details.get('numberOfRunners') or len(runners))
+
+        self.runner_info.num = [_value(runner.get('saddleClothNo')) for runner in runners]
+        self.runner_info.pos = positions
+        self.runner_info.draw = [
+            _value(runner.get('drawLabel')).strip('()') for runner in runners
+        ]
+
+        btn: list[str] = []
+        ovr_btn: list[str] = []
+        for runner, position in zip(runners, positions):
+            completed = position.isnumeric() or position == 'DSQ'
+            if not completed:
+                btn.append('-')
+                ovr_btn.append('-')
+                continue
+            if position == '1':
+                btn.append('0')
+                ovr_btn.append('0')
+                continue
+
+            distance = _distance_value(runner.get('beatenDistance'))
+            total_distance = _distance_value(runner.get('beatenDistanceToWinner'))
+            if not total_distance:
+                total_distance = _distance_value(runner.get('distanceToWinnerNative'))
+            btn.append(distance)
+            ovr_btn.append(total_distance or distance)
+
+        self.runner_info.btn = btn
+        self.runner_info.ovr_btn = ovr_btn
+        self.runner_info.horse_id = [
+            _value(runner.get('horseUid')) for runner in runners
+        ]
+        self.runner_info.horse = [
+            _with_suffix(runner.get('horseName'), runner.get('horseSuffix'))
+            for runner in runners
+        ]
+        self.runner_info.age = [_value(runner.get('age')) for runner in runners]
+        self.runner_info.sex = [
+            _value((runner.get('pedigree') or {}).get('colourSex')).split()[-1].upper()
+            if _value((runner.get('pedigree') or {}).get('colourSex')).split()
+            else ''
+            for runner in runners
+        ]
+        self.runner_info.wgt = [
+            f'{_value(runner.get("weightStones"))}-{_value(runner.get("weightPounds"))}'
+            for runner in runners
+        ]
+        self.runner_info.lbs = [
+            _value(runner.get('weightCarriedLbs')) for runner in runners
+        ]
+        self.runner_info.hg = [_value(runner.get('headgear')) for runner in runners]
+        self.runner_info.sp = [_value(runner.get('odds')) for runner in runners]
+
+        cleaned_odds = [sub(r'(F|J|C)$', '', odds) for odds in self.runner_info.sp]
+        self.runner_info.dec = []
+        for odds in cleaned_odds:
+            try:
+                self.runner_info.dec.extend(fraction_to_decimal([odds]))
+            except (ValueError, ZeroDivisionError):
+                self.runner_info.dec.append('')
+
+        self.runner_info.jockey = [
+            clean_string(_value(runner.get('jockeyName'))) for runner in runners
+        ]
+        self.runner_info.jockey_id = [
+            _profile_id(runner.get('jockeyUrl')) for runner in runners
+        ]
+        self.runner_info.trainer = [
+            clean_string(_value(runner.get('trainerName'))) for runner in runners
+        ]
+        self.runner_info.trainer_id = [
+            _profile_id(runner.get('trainerUrl')) for runner in runners
+        ]
+        self.runner_info.owner = [
+            _owner_name(runner.get('ownerUrl'), runner.get('ownerName'))
+            for runner in runners
+        ]
+        self.runner_info.owner_id = [
+            _profile_id(runner.get('ownerUrl')) for runner in runners
+        ]
+        self.runner_info.silk_url = [
+            _value(runner.get('silkUrl')) for runner in runners
+        ]
+        self.runner_info.ofr = [
+            _value(runner.get('officialRating'), '-') for runner in runners
+        ]
+        self.runner_info.rpr = [
+            _value(runner.get('rpRating'), '-') for runner in runners
+        ]
+        self.runner_info.ts = [
+            _value(runner.get('topspeed'), '-') for runner in runners
+        ]
+
+        prizes = {
+            str(prize.get('position')): _value(prize.get('formatted'))
+            .replace(',', '')
+            .replace('£', '')
+            for prize in header.get('prizes') or []
+        }
+        self.runner_info.prize = [prizes.get(position, '') for position in positions]
+
+        pedigrees = [runner.get('pedigree') or {} for runner in runners]
+        self.runner_info.sire = [
+            _with_suffix(pedigree.get('sireName'), pedigree.get('sireSuffix'))
+            for pedigree in pedigrees
+        ]
+        self.runner_info.sire_id = [
+            _profile_id(pedigree.get('sireUrl')) for pedigree in pedigrees
+        ]
+        self.runner_info.dam = [
+            _with_suffix(pedigree.get('damName'), pedigree.get('damSuffix'))
+            for pedigree in pedigrees
+        ]
+        self.runner_info.dam_id = [
+            _profile_id(pedigree.get('damUrl')) for pedigree in pedigrees
+        ]
+        self.runner_info.damsire = [
+            clean_string(_value(pedigree.get('damSireName'))) for pedigree in pedigrees
+        ]
+        self.runner_info.damsire_id = [
+            _profile_id(pedigree.get('damSireUrl')) for pedigree in pedigrees
+        ]
+
+        comments: list[str] = []
+        for runner in runners:
+            comment_data = runner.get('comment') or {}
+            comment = _value(comment_data.get('comment')).strip()
+            comment = comment.replace('  ', '').replace(',', ' -')
+            comment = comment.replace('\n', ' ').replace('\r', '')
+            betting = _value(comment_data.get('bettingMovements')).strip()
+            comments.append(f'{comment}({betting})' if betting else comment)
+        self.runner_info.comment = comments
+
+        winning_time = _winning_time_seconds(details.get('winningTime'))
+        times: list[str] = []
+        seconds: list[str] = []
+        lps_scale = get_lps_scale(self.race_info.race_type, self.race_info.going)
+        for position, total_distance in zip(positions, ovr_btn):
+            completed = position.isnumeric() or position == 'DSQ'
+            try:
+                finish_seconds = (
+                    winning_time + float(total_distance) / lps_scale
+                    if winning_time is not None and completed
+                    else None
+                )
+            except ValueError:
+                finish_seconds = None
+
+            if finish_seconds is None:
+                times.append('-')
+                seconds.append('-')
+                continue
+
+            minutes = int(finish_seconds // 60)
+            remaining_seconds = finish_seconds % 60
+            times.append(f'{minutes}:{remaining_seconds:05.2f}')
+            seconds.append(f'{finish_seconds:.2f}')
+
+        self.runner_info.time = times
+        self.runner_info.secs = seconds
 
     def calculate_times(
         self, win_time: float, dist_btn: list[str], going: str, race_type: str
